@@ -1,210 +1,289 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Device Stats Comparison</title>
-  <link rel="icon" href="icon.png" type="image/png">
-  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Device Test Statistics</title>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='64' height='64'%3E%3Crect width='100%25' height='100%25' rx='12' fill='%23007ACC'/%3E%3Ctext x='50%25' y='54%25' font-size='30' font-family='Arial, Helvetica, sans-serif' fill='white' text-anchor='middle'%3EΔ%3C/text%3E%3C/svg%3E">
   <style>
-    body { font-family: Arial, sans-serif; margin: 20px; background: #f5f5f5; color: #222; transition: background 0.3s, color 0.3s; }
-    header { display: flex; justify-content: space-between; align-items: center; }
-    .lang-select { position: relative; display: inline-flex; align-items: center; gap: 8px; }
-    .lang-select select { background: #eee; color: #222; padding: 5px; border-radius: 5px; }
-    .lang-flag { font-size: 1.4em; }
-    .controls { margin: 20px 0; display: flex; gap: 20px; align-items: center; flex-wrap: wrap; }
-    .chart-container { width: 100%; max-width: 900px; margin: auto; }
-    label { font-weight: normal; margin-right: 10px; }
-    .theme-toggle { display: none; }
-    .message { margin: 20px 0; font-weight: bold; color: crimson; text-align: center; }
-    .radio-group { display: flex; gap: 15px; align-items: center; }
-    .model-pair { display: flex; flex-direction: column; gap: 10px; }
+    :root{--bg:#0f1724;--card:#0b1220;--muted:#94a3b8;--accent:#07c;--glass:rgba(255,255,255,0.03)}
+    *{box-sizing:border-box}
+    body{font-family:Inter,system-ui,Segoe UI,Roboto,Arial;line-height:1.4;margin:0;background:linear-gradient(180deg,#071029 0%, #071b2b 100%);color:#e6eef8;padding:24px}
+    .container{max-width:980px;margin:0 auto}
+    header{display:flex;gap:12px;align-items:center;margin-bottom:18px}
+    .logo{display:flex;align-items:center;gap:12px}
+    .brand{font-weight:700;font-size:20px}
+    .icon{width:48px;height:48px;border-radius:10px;background:linear-gradient(135deg,#007acc,#00c4ff);display:grid;place-items:center;box-shadow:0 6px 18px rgba(0,0,0,.5)}
+    .top-actions{margin-left:auto;display:flex;gap:8px;align-items:center}
+    .card{background:var(--card);padding:18px;border-radius:12px;box-shadow:0 8px 32px rgba(2,6,23,.6);margin-bottom:16px}
+    label{display:block;color:var(--muted);font-size:13px;margin-bottom:6px}
+    select,multiselect,input{width:100%}
+    .models-list{display:flex;gap:8px;flex-wrap:wrap}
+    .chip{background:var(--glass);padding:8px 10px;border-radius:999px;font-weight:600;font-size:14px;color:#dff;display:inline-flex;gap:8px;align-items:center}
+    .chip .count{background:rgba(255,255,255,0.06);padding:4px 8px;border-radius:999px;font-size:12px}
+    .comparison{display:grid;grid-template-columns:1fr;gap:12px}
+    table{width:100%;border-collapse:collapse}
+    th,td{padding:8px 10px;text-align:left;border-bottom:1px solid rgba(255,255,255,0.04)}
+    th{color:var(--muted);font-size:13px}
+    .lang-select{background:transparent;border:1px solid rgba(255,255,255,0.06);color:inherit;padding:6px 8px;border-radius:8px}
+    .footer{color:var(--muted);font-size:13px;margin-top:14px}
+    @media(min-width:720px){.comparison{grid-template-columns:repeat(2,1fr)}}
+    .loading{opacity:.7}
+    .muted{color:var(--muted)}
+    .controls{display:flex;gap:8px;align-items:center}
+    .search{padding:8px;border-radius:8px;border:1px solid rgba(255,255,255,.04);background:transparent;color:inherit}
+    .btn{background:var(--accent);color:white;padding:8px 12px;border-radius:8px;border:none;cursor:pointer}
   </style>
 </head>
 <body>
-  <header>
-    <h1 id="title">Device Stats Comparison</h1>
-    <div style="display:flex; gap:10px; align-items:center;">
-      <div class="lang-select">
-        <select id="languageSwitcher">
-          <option value="en">English</option>
-          <option value="ru">Русский</option>
-          <option value="uk">Українська</option>
-        </select>
-        <span id="langFlag" class="lang-flag">🇬🇧</span>
+  <div class="container">
+    <header>
+      <div class="logo">
+        <div class="icon" aria-hidden>Δ</div>
+        <div>
+          <div class="brand" id="title">Device Test Statistics</div>
+          <div class="muted" id="subtitle">Live aggregated metrics from Google Sheets</div>
+        </div>
       </div>
-    </div>
-  </header>
 
-  <div class="controls">
-    <div class="model-pair">
-      <label id="modelLabel1">Model 1:</label>
-      <select id="modelSelect1"></select>
-      <label id="modelLabel2">Model 2:</label>
-      <select id="modelSelect2"></select>
-    </div>
-    <div>
-      <label id="metricLabel">Compare by:</label>
-      <div class="radio-group">
-        <label><input type="radio" name="metric" value="avg" checked> <span id="avgLabel">Average</span></label>
-        <label><input type="radio" name="metric" value="min"> <span id="minLabel">Minimum</span></label>
-        <label><input type="radio" name="metric" value="max"> <span id="maxLabel">Maximum</span></label>
+      <div class="top-actions">
+        <div class="controls">
+          <label for="lang" class="muted" style="margin-right:6px" id="langLabel">Language</label>
+          <select id="lang" class="lang-select" title="Language">
+            <option value="en">English</option>
+            <option value="ru">Русский</option>
+            <option value="uk">Українська</option>
+          </select>
+        </div>
       </div>
-    </div>
-  </div>
+    </header>
 
-  <div id="message" class="message" style="display:none;"></div>
+    <section class="card" aria-labelledby="selectHeading">
+      <h3 id="selectHeading">Select models to compare</h3>
+      <p class="muted" id="selectHint">Choose up to 6 models. Default: Balance 2</p>
+      <div style="display:flex;gap:12px;margin-top:10px;align-items:center">
+        <select id="modelSelect" multiple size="6" style="min-width:280px;padding:8px;border-radius:8px;background:transparent;border:1px solid rgba(255,255,255,0.04);color:inherit"></select>
+        <div style="flex:1">
+          <div class="muted">Selected models</div>
+          <div id="selectedChips" class="models-list" style="margin-top:8px"></div>
+          <div style="margin-top:8px;display:flex;gap:8px"><button id="refresh" class="btn">Refresh</button><button id="clear" class="btn" style="background:#445a6b">Clear</button></div>
+        </div>
+      </div>
+    </section>
 
-  <div class="chart-container">
-    <canvas id="statsChart"></canvas>
+    <section class="card comparison">
+      <h3 id="statsHeading">Statistics (prod only)</h3>
+      <div id="tablesContainer" class="loading">Loading…</div>
+    </section>
+
+    <div class="footer" id="footer">Powered by Google Sheets • Data shown only for <strong>prod</strong> mode.</div>
   </div>
 
   <script>
-    const apiUrl = "https://script.google.com/macros/s/AKfycbzoKPI_Nf_xEzwK5r5iafhcxeVzz6DViK3nc65jrujXsb2N9Di10aNED6EeNccrD_2v7w/exec";
-    const cacheDuration = 10 * 60 * 1000; // кэш 10 минут по умолчанию
-    const cache = {};
+    // CONFIG: replace with your Apps Script ID
+    const SCRIPT_ID = 'AKfycbzoKPI_Nf_xEzwK5r5iafhcxeVzz6DViK3nc65jrujXsb2N9Di10aNED6EeNccrD_2v7w';
+    const BASE = 'https://script.google.com/macros/s/' + SCRIPT_ID + '/exec';
 
-    const translations = {
-      en: { title: "Device Stats Comparison", modelLabel1: "Model 1:", modelLabel2: "Model 2:", metricLabel: "Compare by:", avg: "Average", min: "Minimum", max: "Maximum", noData: "No data available for selected models.", flag: "🇬🇧" },
-      ru: { title: "Сравнение статистики устройств", modelLabel1: "Модель 1:", modelLabel2: "Модель 2:", metricLabel: "Сравнивать по:", avg: "Среднее", min: "Минимум", max: "Максимум", noData: "Нет данных для выбранных моделей.", flag: "🇷🇺" },
-      uk: { title: "Порівняння статистики пристроїв", modelLabel1: "Модель 1:", modelLabel2: "Модель 2:", metricLabel: "Порівнювати за:", avg: "Середнє", min: "Мінімум", max: "Максимум", noData: "Немає даних для обраних моделей.", flag: "🇺🇦" }
+    // i18n strings
+    const I18N = {
+      en: {
+        title: 'Device Test Statistics',
+        subtitle: 'Live aggregated metrics from Google Sheets',
+        selectHeading: 'Select models to compare',
+        selectHint: 'Choose up to 6 models. Default: Balance 2',
+        statsHeading: 'Statistics (prod only)',
+        refresh: 'Refresh',
+        clear: 'Clear',
+        loading: 'Loading…',
+        noData: 'No data',
+        modelsLabel: 'Language'
+      },
+      ru: {
+        title: 'Статистика тестов устройств',
+        subtitle: 'Агрегированные данные из Google Sheets',
+        selectHeading: 'Выберите модели для сравнения',
+        selectHint: 'Выберите до 6 моделей. По умолчанию: Balance 2',
+        statsHeading: 'Статистика (только prod)',
+        refresh: 'Обновить',
+        clear: 'Очистить',
+        loading: 'Загрузка…',
+        noData: 'Нет данных',
+        modelsLabel: 'Язык'
+      },
+      uk: {
+        title: 'Статистика тестів пристроїв',
+        subtitle: 'Агреговані дані з Google Sheets',
+        selectHeading: 'Виберіть моделі для порівняння',
+        selectHint: 'Виберіть до 6 моделей. За замовчуванням: Balance 2',
+        statsHeading: 'Статистика (тільки prod)',
+        refresh: 'Оновити',
+        clear: 'Очистити',
+        loading: 'Завантаження…',
+        noData: 'Немає даних',
+        modelsLabel: 'Мова'
+      }
     };
 
-    const langSwitcher = document.getElementById("languageSwitcher");
-    const langFlag = document.getElementById("langFlag");
-    const titleEl = document.getElementById("title");
-    const modelLabel1 = document.getElementById("modelLabel1");
-    const modelLabel2 = document.getElementById("modelLabel2");
-    const metricLabel = document.getElementById("metricLabel");
-    const avgLabel = document.getElementById("avgLabel");
-    const minLabel = document.getElementById("minLabel");
-    const maxLabel = document.getElementById("maxLabel");
-    const modelSelect1 = document.getElementById("modelSelect1");
-    const modelSelect2 = document.getElementById("modelSelect2");
-    const ctx = document.getElementById("statsChart").getContext("2d");
-    const messageEl = document.getElementById("message");
+    // DOM refs
+    const modelSelect = document.getElementById('modelSelect');
+    const selectedChips = document.getElementById('selectedChips');
+    const tablesContainer = document.getElementById('tablesContainer');
+    const refreshBtn = document.getElementById('refresh');
+    const clearBtn = document.getElementById('clear');
+    const langSelect = document.getElementById('lang');
 
-    let chart;
-    let currentLang = "en";
-
-    function setLanguage(lang) {
-      const t = translations[lang];
-      if (!t) return;
-      currentLang = lang;
-      titleEl.textContent = t.title;
-      modelLabel1.textContent = t.modelLabel1;
-      modelLabel2.textContent = t.modelLabel2;
-      metricLabel.textContent = t.metricLabel;
-      avgLabel.textContent = t.avg;
-      minLabel.textContent = t.min;
-      maxLabel.textContent = t.max;
-      langFlag.textContent = t.flag;
+    // Language initialization: auto-detect
+    function detectLang(){
+      const nav = navigator.languages && navigator.languages[0] || navigator.language || 'en';
+      const code = nav.slice(0,2).toLowerCase();
+      return (['en','ru','uk'].includes(code) ? code : 'en');
     }
 
-    function detectLanguage() {
-      const userLang = navigator.language.slice(0,2);
-      if (translations[userLang]) return userLang;
-      return "en";
+    let currentLang = detectLang();
+
+    function t(key){ return I18N[currentLang][key] || I18N['en'][key]; }
+
+    function applyTranslations(){
+      document.getElementById('title').textContent = t('title');
+      document.getElementById('subtitle').textContent = t('subtitle');
+      document.getElementById('selectHeading').textContent = t('selectHeading');
+      document.getElementById('selectHint').textContent = t('selectHint');
+      document.getElementById('statsHeading').textContent = t('statsHeading');
+      document.getElementById('refresh').textContent = t('refresh');
+      document.getElementById('clear').textContent = t('clear');
+      document.getElementById('langLabel').textContent = t('modelsLabel');
+      tablesContainer.textContent = t('loading');
+      langSelect.value = currentLang;
     }
 
-    langSwitcher.addEventListener("change", () => {
-      setLanguage(langSwitcher.value);
-      updateChart();
-    });
+    langSelect.addEventListener('change', ()=>{ currentLang = langSelect.value; applyTranslations(); });
 
-    async function loadModels() {
-      const res = await fetch(apiUrl + "?modelsOnly=true");
-      const data = await res.json();
-      modelSelect1.innerHTML = "";
-      modelSelect2.innerHTML = "";
-      if (!data.models) return;
-      data.models.forEach(model => {
-        const opt1 = document.createElement("option");
-        opt1.value = model;
-        opt1.textContent = model;
-        if (model === "Balance 2") opt1.selected = true;
-        modelSelect1.appendChild(opt1);
+    applyTranslations();
 
-        const opt2 = document.createElement("option");
-        opt2.value = model;
-        opt2.textContent = model;
-        if (model === "Balance 2") opt2.selected = true;
-        modelSelect2.appendChild(opt2);
-      });
-      updateChart();
+    // Helpers
+    function escapeHtml(s){ return String(s).replace(/[&<>\"]/g, c=>({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;' }[c])); }
+
+    // Load models list
+    async function loadModels(){
+      tablesContainer.classList.add('loading');
+      try{
+        const res = await fetch(BASE + '?modelsOnly=true');
+        const j = await res.json();
+        const models = Array.isArray(j.models) ? j.models : [];
+        models.sort();
+
+        // Clear and populate select
+        modelSelect.innerHTML = '';
+        models.forEach(m=>{
+          const opt = document.createElement('option');
+          opt.value = m;
+          opt.textContent = m;
+          modelSelect.appendChild(opt);
+        });
+
+        // Ensure default selection "Balance 2"
+        const defaultName = 'Balance 2';
+        let selected = [];
+        // Try to preselect Balance 2 if present
+        for(const opt of modelSelect.options){ if(opt.value===defaultName){ opt.selected = true; selected.push(opt.value); break } }
+        // If Balance 2 wasn't in list and there are models, pick first one
+        if(selected.length===0 && modelSelect.options.length>0){ modelSelect.options[0].selected = true; selected.push(modelSelect.options[0].value); }
+
+        renderSelected();
+        await refreshStats();
+      }catch(err){
+        tablesContainer.textContent = t('noData');
+        console.error(err);
+      }finally{ tablesContainer.classList.remove('loading'); }
     }
 
-    async function fetchSingleModel(model, metric) {
-      const now = Date.now();
-      if (cache[model] && (now - cache[model].time < cacheDuration)) {
-        return cache[model].data;
-      }
-      const res = await fetch(apiUrl + "?deviceName=" + encodeURIComponent(model));
-      const data = await res.json();
-      if (!data[model]) return null;
-      let result = {};
-      for (let key in data[model]) {
-        if (key !== "count") {
-          result[key] = data[model][key][metric];
-        } else {
-          result[key] = data[model][key];
-        }
-      }
-      cache[model] = { data: { [model]: result }, time: now };
-      return cache[model].data;
-    }
-
-    async function fetchStats(models, metric) {
-      let result = {};
-      for (const model of models) {
-        const modelData = await fetchSingleModel(model, metric);
-        if (modelData) Object.assign(result, modelData);
-      }
-      return result;
-    }
-
-    async function updateChart() {
-      const model1 = modelSelect1.value;
-      const model2 = modelSelect2.value;
-      const metric = document.querySelector('input[name="metric"]:checked').value;
-      if (!model1 || !model2) return;
-
-      const stats = await fetchStats([model1, model2], metric);
-      if (!stats || Object.keys(stats).length === 0) {
-        messageEl.style.display = "block";
-        messageEl.textContent = translations[currentLang].noData;
-        if (chart) chart.destroy();
-        return;
-      }
-      messageEl.style.display = "none";
-
-      const labels = Object.keys(stats[model1] || stats[model2]).filter(k => k !== "count");
-
-      const datasets = Object.keys(stats).map((model, idx) => ({
-        label: model + " (n=" + stats[model].count + ")",
-        data: labels.map(k => stats[model][k]),
-        backgroundColor: `hsl(${idx * 180}, 70%, 50%)`
-      }));
-
-      if (chart) chart.destroy();
-      chart = new Chart(ctx, {
-        type: "bar",
-        data: { labels, datasets },
-        options: {
-          responsive: true,
-          plugins: { legend: { position: "top" } },
-          scales: { y: { beginAtZero: true } }
-        }
+    function renderSelected(){
+      selectedChips.innerHTML = '';
+      const vals = Array.from(modelSelect.selectedOptions).map(o=>o.value).slice(0,6);
+      vals.forEach(v=>{
+        const chip = document.createElement('div'); chip.className='chip';
+        const span = document.createElement('span'); span.textContent = v;
+        const countSpan = document.createElement('span'); countSpan.className='count'; countSpan.textContent='...';
+        chip.appendChild(span); chip.appendChild(countSpan);
+        selectedChips.appendChild(chip);
       });
     }
 
-    modelSelect1.addEventListener("change", updateChart);
-    modelSelect2.addEventListener("change", updateChart);
-    document.querySelectorAll('input[name="metric"]').forEach(r => r.addEventListener("change", updateChart));
+    async function fetchCountForModel(model){
+      try{
+        const url = BASE + '?deviceName=' + encodeURIComponent(model);
+        const res = await fetch(url);
+        const j = await res.json();
+        // j.stats is object where key=model
+        if(j && j.stats && j.stats[model] && typeof j.stats[model].count === 'number'){
+          return j.stats[model].count;
+        }
+        return 0;
+      }catch(e){ console.error(e); return 0; }
+    }
 
-    // init
-    const userLang = detectLanguage();
-    langSwitcher.value = userLang;
-    setLanguage(userLang);
+    async function refreshStats(){
+      tablesContainer.classList.add('loading');
+      tablesContainer.innerHTML = '';
+      const selected = Array.from(modelSelect.selectedOptions).map(o=>o.value).slice(0,6);
+      if(selected.length===0){ tablesContainer.textContent = t('noData'); tablesContainer.classList.remove('loading'); return }
+
+      renderSelected();
+
+      // For each model fetch stats (count + min/max/avg)
+      const panels = document.createElement('div'); panels.style.display='grid'; panels.style.gap='12px';
+      for(const model of selected){
+        const panel = document.createElement('div'); panel.className='card';
+        const h = document.createElement('h4'); h.textContent = model; panel.appendChild(h);
+        const p = document.createElement('div'); p.className='muted'; p.textContent = 'Loading…'; panel.appendChild(p);
+        panels.appendChild(panel);
+
+        // fetch stats
+        (async ()=>{
+          const url = BASE + '?deviceName=' + encodeURIComponent(model);
+          try{
+            const res = await fetch(url);
+            const j = await res.json();
+            const s = j.stats && j.stats[model];
+            // update chip count
+            const chip = Array.from(selectedChips.children).find(c=>c.firstChild.textContent===model);
+            if(chip) chip.querySelector('.count').textContent = (s && typeof s.count==='number') ? s.count : '0';
+
+            panel.removeChild(p);
+            if(!s){ panel.appendChild(document.createTextNode(t('noData'))); return }
+
+            const table = document.createElement('table');
+            const thead = document.createElement('thead'); thead.innerHTML = '<tr><th>Metric</th><th>Min</th><th>Avg</th><th>Max</th></tr>'; table.appendChild(thead);
+            const tbody = document.createElement('tbody');
+            const rows = [ ['Canvas','canvas'], ['CanvasText','canvasText'], ['Widget','widget'], ['Widget2','widget2'], ['Math','math'], ['LS','ls'], ['ES','es'], ['ES BF','esBf'] ];
+            rows.forEach(r=>{
+              const key = r[1];
+              const rowEl = document.createElement('tr');
+              const label = document.createElement('td'); label.textContent = r[0];
+              const min = document.createElement('td'); min.textContent = s[key] ? s[key].min : '-';
+              const avg = document.createElement('td'); avg.textContent = s[key] ? s[key].avg : '-';
+              const max = document.createElement('td'); max.textContent = s[key] ? s[key].max : '-';
+              rowEl.appendChild(label); rowEl.appendChild(min); rowEl.appendChild(avg); rowEl.appendChild(max);
+              tbody.appendChild(rowEl);
+            });
+            table.appendChild(tbody);
+            panel.appendChild(table);
+
+          }catch(err){ console.error(err); p.textContent = t('noData'); }
+        })();
+      }
+
+      tablesContainer.appendChild(panels);
+      tablesContainer.classList.remove('loading');
+    }
+
+    // Events
+    modelSelect.addEventListener('change', ()=>{ renderSelected(); });
+    refreshBtn.addEventListener('click', ()=>refreshStats());
+    clearBtn.addEventListener('click', ()=>{ for(const o of modelSelect.options) o.selected=false; renderSelected(); tablesContainer.innerHTML=''; });
+
+    // initial load
     loadModels();
   </script>
+</body>
+</html>
