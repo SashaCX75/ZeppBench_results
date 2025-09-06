@@ -7,21 +7,21 @@
   <link rel="icon" href="icon.png" type="image/png">
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <style>
-    body { font-family: Arial, sans-serif; margin: 20px; background: #222; color: #eee; transition: background 0.3s, color 0.3s; }
+    body { font-family: Arial, sans-serif; margin: 20px; background: #f5f5f5; color: #222; transition: background 0.3s, color 0.3s; }
     header { display: flex; justify-content: space-between; align-items: center; }
     .lang-select { position: relative; display: inline-flex; align-items: center; gap: 8px; }
-    .lang-select select { background: #444; color: #fff; padding: 5px; border-radius: 5px; }
+    .lang-select select { background: #eee; color: #222; padding: 5px; border-radius: 5px; }
     .lang-flag { font-size: 1.4em; }
     .controls { margin: 20px 0; display: flex; gap: 20px; align-items: center; flex-wrap: wrap; }
     .chart-container { width: 100%; max-width: 900px; margin: auto; }
-    label { font-weight: bold; margin-right: 10px; }
-    .theme-toggle { cursor: pointer; padding: 5px 10px; border: 1px solid #666; border-radius: 5px; background: #444; color: #fff; }
+    label { font-weight: normal; margin-right: 10px; }
+    .theme-toggle { display: none; }
     .message { margin: 20px 0; font-weight: bold; color: crimson; text-align: center; }
     .radio-group { display: flex; gap: 15px; align-items: center; }
     .model-pair { display: flex; flex-direction: column; gap: 10px; }
   </style>
 </head>
-<body class="dark">
+<body>
   <header>
     <h1 id="title">Device Stats Comparison</h1>
     <div style="display:flex; gap:10px; align-items:center;">
@@ -33,7 +33,6 @@
         </select>
         <span id="langFlag" class="lang-flag">🇬🇧</span>
       </div>
-      <button id="themeToggle" class="theme-toggle">☀️ Light</button>
     </div>
   </header>
 
@@ -83,7 +82,6 @@
     const modelSelect1 = document.getElementById("modelSelect1");
     const modelSelect2 = document.getElementById("modelSelect2");
     const ctx = document.getElementById("statsChart").getContext("2d");
-    const themeToggle = document.getElementById("themeToggle");
     const messageEl = document.getElementById("message");
 
     let chart;
@@ -112,11 +110,6 @@
     langSwitcher.addEventListener("change", () => {
       setLanguage(langSwitcher.value);
       updateChart();
-    });
-
-    themeToggle.addEventListener("click", () => {
-      document.body.classList.toggle("dark");
-      themeToggle.textContent = document.body.classList.contains("dark") ? "☀️ Light" : "🌙 Dark";
     });
 
     async function loadModels() {
@@ -215,5 +208,3 @@
     setLanguage(userLang);
     loadModels();
   </script>
-</body>
-</html>
