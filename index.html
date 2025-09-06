@@ -7,24 +7,32 @@
   <link rel="icon" href="icon.png" type="image/png">
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <style>
-    body { font-family: Arial, sans-serif; margin: 20px; background: #f9f9f9; color: #222; }
+    body { font-family: Arial, sans-serif; margin: 20px; background: #f9f9f9; color: #222; transition: background 0.3s, color 0.3s; }
     header { display: flex; justify-content: space-between; align-items: center; }
     .lang-select { position: relative; display: inline-block; }
     .lang-select select { background: #222; color: #fff; padding: 5px; border-radius: 5px; }
-    .controls { margin: 20px 0; display: flex; gap: 20px; align-items: center; }
+    .controls { margin: 20px 0; display: flex; gap: 20px; align-items: center; flex-wrap: wrap; }
     .chart-container { width: 100%; max-width: 900px; margin: auto; }
     label { font-weight: bold; margin-right: 10px; }
+    .theme-toggle { cursor: pointer; padding: 5px 10px; border: 1px solid #ccc; border-radius: 5px; background: #eee; }
+    .message { margin: 20px 0; font-weight: bold; color: crimson; text-align: center; }
+    body.dark { background: #222; color: #eee; }
+    body.dark .lang-select select { background: #444; color: #fff; }
+    body.dark .theme-toggle { background: #444; color: #fff; border-color: #666; }
   </style>
 </head>
 <body>
   <header>
     <h1 id="title">Device Stats Comparison</h1>
-    <div class="lang-select">
-      <select id="languageSwitcher">
-        <option value="en" data-flag="🇬🇧">🇬🇧 English</option>
-        <option value="ru" data-flag="🇷🇺">🇷🇺 Русский</option>
-        <option value="uk" data-flag="🇺🇦">🇺🇦 Українська</option>
-      </select>
+    <div style="display:flex; gap:10px; align-items:center;">
+      <div class="lang-select">
+        <select id="languageSwitcher">
+          <option value="en" data-flag="🇬🇧">🇬🇧 English</option>
+          <option value="ru" data-flag="🇷🇺">🇷🇺 Русский</option>
+          <option value="uk" data-flag="🇺🇦">🇺🇦 Українська</option>
+        </select>
+      </div>
+      <button id="themeToggle" class="theme-toggle">🌙 Dark</button>
     </div>
   </header>
 
@@ -43,6 +51,8 @@
     </div>
   </div>
 
+  <div id="message" class="message" style="display:none;"></div>
+
   <div class="chart-container">
     <canvas id="statsChart"></canvas>
   </div>
@@ -51,9 +61,9 @@
     const apiUrl = "https://script.google.com/macros/s/AKfycbzoKPI_Nf_xEzwK5r5iafhcxeVzz6DViK3nc65jrujXsb2N9Di10aNED6EeNccrD_2v7w/exec";
 
     const translations = {
-      en: { title: "Device Stats Comparison", modelLabel: "Select models:", metricLabel: "Compare by:", avg: "Average", min: "Minimum", max: "Maximum" },
-      ru: { title: "Сравнение статистики устройств", modelLabel: "Выберите модели:", metricLabel: "Сравнивать по:", avg: "Среднее", min: "Минимум", max: "Максимум" },
-      uk: { title: "Порівняння статистики пристроїв", modelLabel: "Оберіть моделі:", metricLabel: "Порівнювати за:", avg: "Середнє", min: "Мінімум", max: "Максимум" }
+      en: { title: "Device Stats Comparison", modelLabel: "Select models:", metricLabel: "Compare by:", avg: "Average", min: "Minimum", max: "Maximum", noData: "No data available for selected models." },
+      ru: { title: "Сравнение статистики устройств", modelLabel: "Выберите модели:", metricLabel: "Сравнивать по:", avg: "Среднее", min: "Минимум", max: "Максимум", noData: "Нет данных для выбранных моделей." },
+      uk: { title: "Порівняння статистики пристроїв", modelLabel: "Оберіть моделі:", metricLabel: "Порівнювати за:", avg: "Середнє", min: "Мінімум", max: "Максимум", noData: "Немає даних для обраних моделей." }
     };
 
     const langSwitcher = document.getElementById("languageSwitcher");
@@ -63,11 +73,16 @@
     const metricSelect = document.getElementById("metricSelect");
     const modelSelect = document.getElementById("modelSelect");
     const ctx = document.getElementById("statsChart").getContext("2d");
+    const themeToggle = document.getElementById("themeToggle");
+    const messageEl = document.getElementById("message");
 
     let chart;
+    let currentLang = "en";
 
     function setLanguage(lang) {
       const t = translations[lang];
+      if (!t) return;
+      currentLang = lang;
       titleEl.textContent = t.title;
       modelLabel.textContent = t.modelLabel;
       metricLabel.textContent = t.metricLabel;
@@ -87,10 +102,16 @@
       updateChart();
     });
 
+    themeToggle.addEventListener("click", () => {
+      document.body.classList.toggle("dark");
+      themeToggle.textContent = document.body.classList.contains("dark") ? "☀️ Light" : "🌙 Dark";
+    });
+
     async function loadModels() {
       const res = await fetch(apiUrl + "?modelsOnly=true");
       const data = await res.json();
       modelSelect.innerHTML = "";
+      if (!data.models) return;
       data.models.forEach(model => {
         const opt = document.createElement("option");
         opt.value = model;
@@ -126,6 +147,14 @@
       if (!selectedModels.length) return;
 
       const stats = await fetchStats(selectedModels, metric);
+      if (!stats || Object.keys(stats).length === 0) {
+        messageEl.style.display = "block";
+        messageEl.textContent = translations[currentLang].noData;
+        if (chart) chart.destroy();
+        return;
+      }
+      messageEl.style.display = "none";
+
       const labels = Object.keys(stats[selectedModels[0]]).filter(k => k !== "count");
 
       const datasets = Object.keys(stats).map((model, idx) => {
