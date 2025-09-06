@@ -7,47 +7,49 @@
   <link rel="icon" href="icon.png" type="image/png">
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <style>
-    body { font-family: Arial, sans-serif; margin: 20px; background: #f9f9f9; color: #222; transition: background 0.3s, color 0.3s; }
+    body { font-family: Arial, sans-serif; margin: 20px; background: #222; color: #eee; transition: background 0.3s, color 0.3s; }
     header { display: flex; justify-content: space-between; align-items: center; }
     .lang-select { position: relative; display: inline-block; }
-    .lang-select select { background: #222; color: #fff; padding: 5px; border-radius: 5px; }
+    .lang-select select { background: #444; color: #fff; padding: 5px; border-radius: 5px; }
     .controls { margin: 20px 0; display: flex; gap: 20px; align-items: center; flex-wrap: wrap; }
     .chart-container { width: 100%; max-width: 900px; margin: auto; }
     label { font-weight: bold; margin-right: 10px; }
-    .theme-toggle { cursor: pointer; padding: 5px 10px; border: 1px solid #ccc; border-radius: 5px; background: #eee; }
+    .theme-toggle { cursor: pointer; padding: 5px 10px; border: 1px solid #666; border-radius: 5px; background: #444; color: #fff; }
     .message { margin: 20px 0; font-weight: bold; color: crimson; text-align: center; }
-    body.dark { background: #222; color: #eee; }
-    body.dark .lang-select select { background: #444; color: #fff; }
-    body.dark .theme-toggle { background: #444; color: #fff; border-color: #666; }
+    .radio-group { display: flex; gap: 15px; align-items: center; }
+    .model-pair { display: flex; flex-direction: column; gap: 10px; }
+    .flag-option { font-size: 1.2em; }
   </style>
 </head>
-<body>
+<body class="dark">
   <header>
     <h1 id="title">Device Stats Comparison</h1>
     <div style="display:flex; gap:10px; align-items:center;">
       <div class="lang-select">
         <select id="languageSwitcher">
-          <option value="en" data-flag="🇬🇧">🇬🇧 English</option>
-          <option value="ru" data-flag="🇷🇺">🇷🇺 Русский</option>
-          <option value="uk" data-flag="🇺🇦">🇺🇦 Українська</option>
+          <option value="en">🇬🇧 English</option>
+          <option value="ru">🇷🇺 Русский</option>
+          <option value="uk">🇺🇦 Українська</option>
         </select>
       </div>
-      <button id="themeToggle" class="theme-toggle">🌙 Dark</button>
+      <button id="themeToggle" class="theme-toggle">☀️ Light</button>
     </div>
   </header>
 
   <div class="controls">
-    <div>
-      <label for="modelSelect" id="modelLabel">Select models:</label>
-      <select id="modelSelect" multiple size="5"></select>
+    <div class="model-pair">
+      <label id="modelLabel1">Model 1:</label>
+      <select id="modelSelect1"></select>
+      <label id="modelLabel2">Model 2:</label>
+      <select id="modelSelect2"></select>
     </div>
     <div>
-      <label for="metricSelect" id="metricLabel">Compare by:</label>
-      <select id="metricSelect">
-        <option value="avg">Average</option>
-        <option value="min">Minimum</option>
-        <option value="max">Maximum</option>
-      </select>
+      <label id="metricLabel">Compare by:</label>
+      <div class="radio-group">
+        <label><input type="radio" name="metric" value="avg" checked> <span id="avgLabel">Average</span></label>
+        <label><input type="radio" name="metric" value="min"> <span id="minLabel">Minimum</span></label>
+        <label><input type="radio" name="metric" value="max"> <span id="maxLabel">Maximum</span></label>
+      </div>
     </div>
   </div>
 
@@ -61,17 +63,21 @@
     const apiUrl = "https://script.google.com/macros/s/AKfycbzoKPI_Nf_xEzwK5r5iafhcxeVzz6DViK3nc65jrujXsb2N9Di10aNED6EeNccrD_2v7w/exec";
 
     const translations = {
-      en: { title: "Device Stats Comparison", modelLabel: "Select models:", metricLabel: "Compare by:", avg: "Average", min: "Minimum", max: "Maximum", noData: "No data available for selected models." },
-      ru: { title: "Сравнение статистики устройств", modelLabel: "Выберите модели:", metricLabel: "Сравнивать по:", avg: "Среднее", min: "Минимум", max: "Максимум", noData: "Нет данных для выбранных моделей." },
-      uk: { title: "Порівняння статистики пристроїв", modelLabel: "Оберіть моделі:", metricLabel: "Порівнювати за:", avg: "Середнє", min: "Мінімум", max: "Максимум", noData: "Немає даних для обраних моделей." }
+      en: { title: "Device Stats Comparison", modelLabel1: "Model 1:", modelLabel2: "Model 2:", metricLabel: "Compare by:", avg: "Average", min: "Minimum", max: "Maximum", noData: "No data available for selected models." },
+      ru: { title: "Сравнение статистики устройств", modelLabel1: "Модель 1:", modelLabel2: "Модель 2:", metricLabel: "Сравнивать по:", avg: "Среднее", min: "Минимум", max: "Максимум", noData: "Нет данных для выбранных моделей." },
+      uk: { title: "Порівняння статистики пристроїв", modelLabel1: "Модель 1:", modelLabel2: "Модель 2:", metricLabel: "Порівнювати за:", avg: "Середнє", min: "Мінімум", max: "Максимум", noData: "Немає даних для обраних моделей." }
     };
 
     const langSwitcher = document.getElementById("languageSwitcher");
     const titleEl = document.getElementById("title");
-    const modelLabel = document.getElementById("modelLabel");
+    const modelLabel1 = document.getElementById("modelLabel1");
+    const modelLabel2 = document.getElementById("modelLabel2");
     const metricLabel = document.getElementById("metricLabel");
-    const metricSelect = document.getElementById("metricSelect");
-    const modelSelect = document.getElementById("modelSelect");
+    const avgLabel = document.getElementById("avgLabel");
+    const minLabel = document.getElementById("minLabel");
+    const maxLabel = document.getElementById("maxLabel");
+    const modelSelect1 = document.getElementById("modelSelect1");
+    const modelSelect2 = document.getElementById("modelSelect2");
     const ctx = document.getElementById("statsChart").getContext("2d");
     const themeToggle = document.getElementById("themeToggle");
     const messageEl = document.getElementById("message");
@@ -84,11 +90,12 @@
       if (!t) return;
       currentLang = lang;
       titleEl.textContent = t.title;
-      modelLabel.textContent = t.modelLabel;
+      modelLabel1.textContent = t.modelLabel1;
+      modelLabel2.textContent = t.modelLabel2;
       metricLabel.textContent = t.metricLabel;
-      metricSelect.options[0].textContent = t.avg;
-      metricSelect.options[1].textContent = t.min;
-      metricSelect.options[2].textContent = t.max;
+      avgLabel.textContent = t.avg;
+      minLabel.textContent = t.min;
+      maxLabel.textContent = t.max;
     }
 
     function detectLanguage() {
@@ -110,14 +117,21 @@
     async function loadModels() {
       const res = await fetch(apiUrl + "?modelsOnly=true");
       const data = await res.json();
-      modelSelect.innerHTML = "";
+      modelSelect1.innerHTML = "";
+      modelSelect2.innerHTML = "";
       if (!data.models) return;
       data.models.forEach(model => {
-        const opt = document.createElement("option");
-        opt.value = model;
-        opt.textContent = model;
-        if (model === "Balance 2") opt.selected = true;
-        modelSelect.appendChild(opt);
+        const opt1 = document.createElement("option");
+        opt1.value = model;
+        opt1.textContent = model;
+        if (model === "Balance 2") opt1.selected = true;
+        modelSelect1.appendChild(opt1);
+
+        const opt2 = document.createElement("option");
+        opt2.value = model;
+        opt2.textContent = model;
+        if (model === "Balance 2") opt2.selected = true;
+        modelSelect2.appendChild(opt2);
       });
       updateChart();
     }
@@ -142,11 +156,12 @@
     }
 
     async function updateChart() {
-      const selectedModels = Array.from(modelSelect.selectedOptions).map(o => o.value);
-      const metric = metricSelect.value;
-      if (!selectedModels.length) return;
+      const model1 = modelSelect1.value;
+      const model2 = modelSelect2.value;
+      const metric = document.querySelector('input[name="metric"]:checked').value;
+      if (!model1 || !model2) return;
 
-      const stats = await fetchStats(selectedModels, metric);
+      const stats = await fetchStats([model1, model2], metric);
       if (!stats || Object.keys(stats).length === 0) {
         messageEl.style.display = "block";
         messageEl.textContent = translations[currentLang].noData;
@@ -155,13 +170,13 @@
       }
       messageEl.style.display = "none";
 
-      const labels = Object.keys(stats[selectedModels[0]]).filter(k => k !== "count");
+      const labels = Object.keys(stats[model1] || stats[model2]).filter(k => k !== "count");
 
       const datasets = Object.keys(stats).map((model, idx) => {
         return {
           label: model + " (n=" + stats[model].count + ")",
           data: labels.map(k => stats[model][k]),
-          backgroundColor: `hsl(${idx * 60}, 70%, 50%)`
+          backgroundColor: `hsl(${idx * 180}, 70%, 50%)`
         };
       });
 
@@ -177,8 +192,9 @@
       });
     }
 
-    modelSelect.addEventListener("change", updateChart);
-    metricSelect.addEventListener("change", updateChart);
+    modelSelect1.addEventListener("change", updateChart);
+    modelSelect2.addEventListener("change", updateChart);
+    document.querySelectorAll('input[name="metric"]').forEach(r => r.addEventListener("change", updateChart));
 
     // init
     const userLang = detectLanguage();
