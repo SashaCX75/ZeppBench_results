@@ -9,8 +9,9 @@
   <style>
     body { font-family: Arial, sans-serif; margin: 20px; background: #222; color: #eee; transition: background 0.3s, color 0.3s; }
     header { display: flex; justify-content: space-between; align-items: center; }
-    .lang-select { position: relative; display: inline-block; }
+    .lang-select { position: relative; display: inline-flex; align-items: center; gap: 8px; }
     .lang-select select { background: #444; color: #fff; padding: 5px; border-radius: 5px; }
+    .lang-flag { font-size: 1.4em; }
     .controls { margin: 20px 0; display: flex; gap: 20px; align-items: center; flex-wrap: wrap; }
     .chart-container { width: 100%; max-width: 900px; margin: auto; }
     label { font-weight: bold; margin-right: 10px; }
@@ -18,7 +19,6 @@
     .message { margin: 20px 0; font-weight: bold; color: crimson; text-align: center; }
     .radio-group { display: flex; gap: 15px; align-items: center; }
     .model-pair { display: flex; flex-direction: column; gap: 10px; }
-    .flag-option { font-size: 1.2em; }
   </style>
 </head>
 <body class="dark">
@@ -27,10 +27,11 @@
     <div style="display:flex; gap:10px; align-items:center;">
       <div class="lang-select">
         <select id="languageSwitcher">
-          <option value="en">🇬🇧 English</option>
-          <option value="ru">🇷🇺 Русский</option>
-          <option value="uk">🇺🇦 Українська</option>
+          <option value="en">English</option>
+          <option value="ru">Русский</option>
+          <option value="uk">Українська</option>
         </select>
+        <span id="langFlag" class="lang-flag">🇬🇧</span>
       </div>
       <button id="themeToggle" class="theme-toggle">☀️ Light</button>
     </div>
@@ -63,12 +64,13 @@
     const apiUrl = "https://script.google.com/macros/s/AKfycbzoKPI_Nf_xEzwK5r5iafhcxeVzz6DViK3nc65jrujXsb2N9Di10aNED6EeNccrD_2v7w/exec";
 
     const translations = {
-      en: { title: "Device Stats Comparison", modelLabel1: "Model 1:", modelLabel2: "Model 2:", metricLabel: "Compare by:", avg: "Average", min: "Minimum", max: "Maximum", noData: "No data available for selected models." },
-      ru: { title: "Сравнение статистики устройств", modelLabel1: "Модель 1:", modelLabel2: "Модель 2:", metricLabel: "Сравнивать по:", avg: "Среднее", min: "Минимум", max: "Максимум", noData: "Нет данных для выбранных моделей." },
-      uk: { title: "Порівняння статистики пристроїв", modelLabel1: "Модель 1:", modelLabel2: "Модель 2:", metricLabel: "Порівнювати за:", avg: "Середнє", min: "Мінімум", max: "Максимум", noData: "Немає даних для обраних моделей." }
+      en: { title: "Device Stats Comparison", modelLabel1: "Model 1:", modelLabel2: "Model 2:", metricLabel: "Compare by:", avg: "Average", min: "Minimum", max: "Maximum", noData: "No data available for selected models.", flag: "🇬🇧" },
+      ru: { title: "Сравнение статистики устройств", modelLabel1: "Модель 1:", modelLabel2: "Модель 2:", metricLabel: "Сравнивать по:", avg: "Среднее", min: "Минимум", max: "Максимум", noData: "Нет данных для выбранных моделей.", flag: "🇷🇺" },
+      uk: { title: "Порівняння статистики пристроїв", modelLabel1: "Модель 1:", modelLabel2: "Модель 2:", metricLabel: "Порівнювати за:", avg: "Середнє", min: "Мінімум", max: "Максимум", noData: "Немає даних для обраних моделей.", flag: "🇺🇦" }
     };
 
     const langSwitcher = document.getElementById("languageSwitcher");
+    const langFlag = document.getElementById("langFlag");
     const titleEl = document.getElementById("title");
     const modelLabel1 = document.getElementById("modelLabel1");
     const modelLabel2 = document.getElementById("modelLabel2");
@@ -96,6 +98,7 @@
       avgLabel.textContent = t.avg;
       minLabel.textContent = t.min;
       maxLabel.textContent = t.max;
+      langFlag.textContent = t.flag;
     }
 
     function detectLanguage() {
@@ -136,22 +139,27 @@
       updateChart();
     }
 
-    async function fetchStats(models, metric) {
-      const res = await fetch(apiUrl + "?deviceName=" + models.join(","));
+    async function fetchSingleModel(model, metric) {
+      const res = await fetch(apiUrl + "?deviceName=" + encodeURIComponent(model));
       const data = await res.json();
+      if (!data[model]) return null;
       let result = {};
-      models.forEach(model => {
-        if (data[model]) {
-          result[model] = {};
-          for (let key in data[model]) {
-            if (key !== "count") {
-              result[model][key] = data[model][key][metric];
-            } else {
-              result[model][key] = data[model][key];
-            }
-          }
+      for (let key in data[model]) {
+        if (key !== "count") {
+          result[key] = data[model][key][metric];
+        } else {
+          result[key] = data[model][key];
         }
-      });
+      }
+      return { [model]: result };
+    }
+
+    async function fetchStats(models, metric) {
+      let result = {};
+      for (const model of models) {
+        const modelData = await fetchSingleModel(model, metric);
+        if (modelData) Object.assign(result, modelData);
+      }
       return result;
     }
 
@@ -204,3 +212,4 @@
   </script>
 </body>
 </html>
+
