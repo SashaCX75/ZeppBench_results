@@ -62,6 +62,8 @@
 
   <script>
     const apiUrl = "https://script.google.com/macros/s/AKfycbzoKPI_Nf_xEzwK5r5iafhcxeVzz6DViK3nc65jrujXsb2N9Di10aNED6EeNccrD_2v7w/exec";
+    const cacheDuration = 10 * 60 * 1000; // кэш 10 минут по умолчанию
+    const cache = {};
 
     const translations = {
       en: { title: "Device Stats Comparison", modelLabel1: "Model 1:", modelLabel2: "Model 2:", metricLabel: "Compare by:", avg: "Average", min: "Minimum", max: "Maximum", noData: "No data available for selected models.", flag: "🇬🇧" },
@@ -140,6 +142,10 @@
     }
 
     async function fetchSingleModel(model, metric) {
+      const now = Date.now();
+      if (cache[model] && (now - cache[model].time < cacheDuration)) {
+        return cache[model].data;
+      }
       const res = await fetch(apiUrl + "?deviceName=" + encodeURIComponent(model));
       const data = await res.json();
       if (!data[model]) return null;
@@ -151,7 +157,8 @@
           result[key] = data[model][key];
         }
       }
-      return { [model]: result };
+      cache[model] = { data: { [model]: result }, time: now };
+      return cache[model].data;
     }
 
     async function fetchStats(models, metric) {
@@ -180,13 +187,11 @@
 
       const labels = Object.keys(stats[model1] || stats[model2]).filter(k => k !== "count");
 
-      const datasets = Object.keys(stats).map((model, idx) => {
-        return {
-          label: model + " (n=" + stats[model].count + ")",
-          data: labels.map(k => stats[model][k]),
-          backgroundColor: `hsl(${idx * 180}, 70%, 50%)`
-        };
-      });
+      const datasets = Object.keys(stats).map((model, idx) => ({
+        label: model + " (n=" + stats[model].count + ")",
+        data: labels.map(k => stats[model][k]),
+        backgroundColor: `hsl(${idx * 180}, 70%, 50%)`
+      }));
 
       if (chart) chart.destroy();
       chart = new Chart(ctx, {
@@ -212,4 +217,3 @@
   </script>
 </body>
 </html>
-
