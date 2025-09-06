@@ -76,35 +76,54 @@
     const clearBtn = document.getElementById('clear');
     const langSelect = document.getElementById('lang');
 
+    let cache = {};
+    let currentLang = 'en';
+
     function detectLang(){
       const nav = navigator.languages && navigator.languages[0] || navigator.language || 'en';
       const code = nav.slice(0,2).toLowerCase();
       return (['en','ru','uk'].includes(code) ? code : 'en');
     }
 
-    let currentLang = detectLang();
-    langSelect.value = currentLang;
+    const translations = {
+      en: {title:'Device Test Statistics', subtitle:'Live aggregated metrics from Google Sheets', selectHeading:'Select models to compare', selectHint:'Choose up to 6 models. Default: Balance 2', statsHeading:'Statistics (prod only)', noData:'No data', langLabel:'Language'},
+      ru: {title:'Статистика тестов устройств', subtitle:'Агрегированные данные из Google Sheets', selectHeading:'Выберите модели для сравнения', selectHint:'Выберите до 6 моделей. По умолчанию: Balance 2', statsHeading:'Статистика (prod только)', noData:'Нет данных', langLabel:'Язык'},
+      uk: {title:'Статистика тестів пристроїв', subtitle:'Агреговані дані з Google Sheets', selectHeading:'Виберіть моделі для порівняння', selectHint:'Виберіть до 6 моделей. За замовчуванням: Balance 2', statsHeading:'Статистика (prod тільки)', noData:'Немає даних', langLabel:'Мова'}
+    };
+
+    function applyLang(){
+      const t = translations[currentLang];
+      document.getElementById('title').textContent = t.title;
+      document.getElementById('subtitle').textContent = t.subtitle;
+      document.getElementById('selectHeading').textContent = t.selectHeading;
+      document.getElementById('selectHint').textContent = t.selectHint;
+      document.getElementById('statsHeading').textContent = t.statsHeading;
+      document.getElementById('langLabel').textContent = t.langLabel;
+    }
+
+    langSelect.value = detectLang();
+    currentLang = langSelect.value;
+    applyLang();
+
+    langSelect.addEventListener('change',()=>{currentLang=langSelect.value;applyLang();});
 
     async function loadModels(){
       tablesContainer.classList.add('loading');
       try{
-        const res = await fetch(BASE + '?modelsOnly=true');
+        const res = await fetch(BASE+'?modelsOnly=true');
         const j = await res.json();
-        const models = Array.isArray(j.models) ? j.models : [];
+        const models = Array.isArray(j.models)?j.models:[];
         models.sort();
-        modelContainer.innerHTML = '';
-        models.forEach(m => {
-          const lbl = document.createElement('label');
-          const chk = document.createElement('input');
-          chk.type = 'checkbox';
-          chk.value = m;
-          if(m==='Balance 2') chk.checked = true;
-          lbl.appendChild(chk);
-          lbl.appendChild(document.createTextNode(m));
+        modelContainer.innerHTML='';
+        models.forEach(m=>{
+          const lbl=document.createElement('label');
+          const chk=document.createElement('input'); chk.type='checkbox'; chk.value=m;
+          if(m==='Balance 2') chk.checked=true;
+          lbl.appendChild(chk); lbl.appendChild(document.createTextNode(m));
           modelContainer.appendChild(lbl);
         });
         await refreshStats();
-      }catch(e){ console.error(e); tablesContainer.textContent='No data'; }
+      }catch(e){ console.error(e); tablesContainer.textContent=translations[currentLang].noData; }
       finally{ tablesContainer.classList.remove('loading'); }
     }
 
@@ -112,43 +131,49 @@
       return Array.from(modelContainer.querySelectorAll('input[type=checkbox]:checked')).map(c=>c.value).slice(0,6);
     }
 
+    async function fetchModelStats(model){
+      if(cache[model]) return cache[model];
+      try{
+        const res = await fetch(BASE+'?deviceName='+encodeURIComponent(model));
+        const j = await res.json();
+        const s = j.stats && j.stats[model];
+        cache[model] = s || null;
+        return cache[model];
+      }catch(e){ console.error(e); return null; }
+    }
+
     async function refreshStats(){
       tablesContainer.classList.add('loading');
       tablesContainer.innerHTML='';
       const selected = getSelectedModels();
-      if(selected.length===0){ tablesContainer.textContent='No data'; tablesContainer.classList.remove('loading'); return }
+      if(selected.length===0){ tablesContainer.textContent=translations[currentLang].noData; tablesContainer.classList.remove('loading'); return }
 
       const panels = document.createElement('div'); panels.style.display='grid'; panels.style.gap='12px';
 
       for(const model of selected){
         const panel = document.createElement('div'); panel.className='card';
-        const h = document.createElement('h4'); h.textContent = model; panel.appendChild(h);
-        const p = document.createElement('div'); p.className='muted'; p.textContent='Loading…'; panel.appendChild(p);
+        const h=document.createElement('h4'); h.textContent=model; panel.appendChild(h);
+        const p=document.createElement('div'); p.className='muted'; p.textContent='Loading…'; panel.appendChild(p);
         panels.appendChild(panel);
 
         (async ()=>{
-          try{
-            const res = await fetch(BASE+'?deviceName='+encodeURIComponent(model));
-            const j = await res.json();
-            const s = j.stats && j.stats[model];
-            panel.removeChild(p);
-            if(!s){ panel.appendChild(document.createTextNode('No data')); return }
-            const table = document.createElement('table');
-            const thead = document.createElement('thead'); thead.innerHTML='<tr><th>Metric</th><th>Min</th><th>Avg</th><th>Max</th></tr>'; table.appendChild(thead);
-            const tbody = document.createElement('tbody');
-            const rows = [['Canvas','canvas'], ['CanvasText','canvasText'], ['Widget','widget'], ['Widget2','widget2'], ['Math','math'], ['LS','ls'], ['ES','es'], ['ES BF','esBf']];
-            rows.forEach(r=>{
-              const tr = document.createElement('tr');
-              const tdLabel = document.createElement('td'); tdLabel.textContent=r[0];
-              const tdMin = document.createElement('td'); tdMin.textContent=s[r[1]]?s[r[1]].min:'-';
-              const tdAvg = document.createElement('td'); tdAvg.textContent=s[r[1]]?s[r[1]].avg:'-';
-              const tdMax = document.createElement('td'); tdMax.textContent=s[r[1]]?s[r[1]].max:'-';
-              tr.append(tdLabel,tdMin,tdAvg,tdMax);
-              tbody.appendChild(tr);
-            });
-            table.appendChild(tbody);
-            panel.appendChild(table);
-          }catch(e){ console.error(e); p.textContent='No data'; }
+          const s = await fetchModelStats(model);
+          panel.removeChild(p);
+          if(!s){ panel.appendChild(document.createTextNode(translations[currentLang].noData)); return }
+          const table=document.createElement('table');
+          const thead=document.createElement('thead');
+          thead.innerHTML='<tr><th>Metric</th><th>Min</th><th>Avg</th><th>Max</th></tr>'; table.appendChild(thead);
+          const tbody=document.createElement('tbody');
+          const rows=[['Canvas','canvas'],['CanvasText','canvasText'],['Widget','widget'],['Widget2','widget2'],['Math','math'],['LS','ls'],['ES','es'],['ES BF','esBf']];
+          rows.forEach(r=>{
+            const tr=document.createElement('tr');
+            const tdLabel=document.createElement('td'); tdLabel.textContent=r[0];
+            const tdMin=document.createElement('td'); tdMin.textContent=s[r[1]]?s[r[1]].min:'-';
+            const tdAvg=document.createElement('td'); tdAvg.textContent=s[r[1]]?s[r[1]].avg:'-';
+            const tdMax=document.createElement('td'); tdMax.textContent=s[r[1]]?s[r[1]].max:'-';
+            tr.append(tdLabel,tdMin,tdAvg,tdMax); tbody.appendChild(tr);
+          });
+          table.appendChild(tbody); panel.appendChild(table);
         })();
       }
       tablesContainer.appendChild(panels);
@@ -156,7 +181,7 @@
     }
 
     refreshBtn.addEventListener('click', refreshStats);
-    clearBtn.addEventListener('click', ()=>{ modelContainer.querySelectorAll('input[type=checkbox]').forEach(c=>c.checked=false); tablesContainer.innerHTML=''; });
+    clearBtn.addEventListener('click',()=>{ modelContainer.querySelectorAll('input[type=checkbox]').forEach(c=>c.checked=false); tablesContainer.innerHTML=''; });
 
     loadModels();
   </script>
