@@ -8,8 +8,8 @@
   <style>
     :root{--bg:#0f1724;--card:#0b1220;--muted:#94a3b8;--accent:#07c;--glass:rgba(255,255,255,0.03)}
     *{box-sizing:border-box}
-    body{font-family:Inter,system-ui,Segoe UI,Roboto,Arial;line-height:1.4;margin:0;background:linear-gradient(180deg,#071029 0%, #071b2b 100%);color:#e6eef8;padding:24px}
-    .container{max-width:980px;margin:0 auto}
+    body{font-family:Inter,system-ui,Segoe UI,Roboto,Arial;line-height:1.4;margin:0;background:var(--bg);color:#e6eef8;display:flex;flex-direction:column;min-height:100vh;}
+    .container{max-width:980px;margin:0 auto;padding:24px;flex:1}
     header{display:flex;gap:12px;align-items:center;margin-bottom:18px}
     .logo{display:flex;align-items:center;gap:12px}
     .brand{font-weight:700;font-size:20px}
@@ -23,6 +23,9 @@
     .btn{background:var(--accent);color:white;padding:8px 12px;border-radius:8px;border:none;cursor:pointer}
     .btn.clear{background:#445a6b}
     .muted{color:var(--muted)}
+    .footer{background:var(--card);padding:12px;text-align:center;box-shadow:0 -2px 12px rgba(0,0,0,.5);margin-top:auto}
+    .lang-container{display:flex;align-items:center;gap:6px}
+    .lang-flag{width:20px;height:14px;display:inline-block;}
   </style>
 </head>
 <body>
@@ -37,8 +40,9 @@
       </div>
 
       <div class="top-actions">
-        <div class="controls">
-          <label for="lang" class="muted" style="margin-right:6px" id="langLabel">Language</label>
+        <div class="controls lang-container">
+          <label for="lang" class="muted" id="langLabel">Language</label>
+          <span class="lang-flag" id="langFlag"></span>
           <select id="lang" title="Language">
             <option value="en">English</option>
             <option value="ru">Русский</option>
@@ -63,8 +67,9 @@
       <div id="tablesContainer" class="loading">Loading…</div>
     </section>
 
-    <div class="footer" id="footer">Powered by Google Sheets • Data shown only for <strong>prod</strong> mode.</div>
   </div>
+
+  <div class="footer" id="footer">Powered by Google Sheets • Data shown only for <strong>prod</strong> mode. <span id="updateDate"></span></div>
 
   <script>
     const SCRIPT_ID = 'AKfycbzoKPI_Nf_xEzwK5r5iafhcxeVzz6DViK3nc65jrujXsb2N9Di10aNED6EeNccrD_2v7w';
@@ -75,6 +80,8 @@
     const refreshBtn = document.getElementById('refresh');
     const clearBtn = document.getElementById('clear');
     const langSelect = document.getElementById('lang');
+    const langFlag = document.getElementById('langFlag');
+    const updateDate = document.getElementById('updateDate');
 
     let cache = {};
     let currentLang = 'en';
@@ -84,6 +91,9 @@
       const code = nav.slice(0,2).toLowerCase();
       return (['en','ru','uk'].includes(code) ? code : 'en');
     }
+
+    function getFlag(code){
+      switch(code){case'en':return'🇬🇧';case'ru':return'🇷🇺';case'uk':return'🇺🇦';default:return''}}
 
     const translations = {
       en: {title:'Device Test Statistics', subtitle:'Live aggregated metrics from Google Sheets', selectHeading:'Select models to compare', selectHint:'Choose up to 6 models. Default: Balance 2', statsHeading:'Statistics (prod only)', noData:'No data', langLabel:'Language'},
@@ -99,6 +109,7 @@
       document.getElementById('selectHint').textContent = t.selectHint;
       document.getElementById('statsHeading').textContent = t.statsHeading;
       document.getElementById('langLabel').textContent = t.langLabel;
+      langFlag.textContent = getFlag(currentLang);
     }
 
     langSelect.value = detectLang();
@@ -107,25 +118,39 @@
 
     langSelect.addEventListener('change',()=>{currentLang=langSelect.value;applyLang();});
 
-    async function loadModels(){
-      tablesContainer.classList.add('loading');
-      try{
-        const res = await fetch(BASE+'?modelsOnly=true');
-        const j = await res.json();
-        const models = Array.isArray(j.models)?j.models:[];
-        models.sort();
-        modelContainer.innerHTML='';
-        models.forEach(m=>{
-          const lbl=document.createElement('label');
-          const chk=document.createElement('input'); chk.type='checkbox'; chk.value=m;
-          if(m==='Balance 2') chk.checked=true;
-          lbl.appendChild(chk); lbl.appendChild(document.createTextNode(m));
-          modelContainer.appendChild(lbl);
-        });
-        await refreshStats();
-      }catch(e){ console.error(e); tablesContainer.textContent=translations[currentLang].noData; }
-      finally{ tablesContainer.classList.remove('loading'); }
+  // Load models
+  async function loadModels(){
+    tablesContainer.classList.add('loading');
+    try {
+      const res = await fetch(BASE+'?modelsOnly=true');
+      const j = await res.json();
+      const models = Array.isArray(j.models) ? j.models : [];
+  
+      // сортировка по имени
+      models.sort((a,b)=>a.name.localeCompare(b.name));
+  
+      modelContainer.innerHTML='';
+      models.forEach(({name, count})=>{
+        const lbl=document.createElement('label');
+        const chk=document.createElement('input');
+        chk.type='checkbox';
+        chk.value=name;
+        if(name==='Balance 2') chk.checked=true;
+  
+        // подпись вида "ModelName (count)"
+        lbl.appendChild(chk);
+        lbl.appendChild(document.createTextNode(`${name} (${count})`));
+        modelContainer.appendChild(lbl);
+      });
+  
+      await refreshStats();
+    } catch(e) {
+      console.error(e);
+      tablesContainer.textContent = translations[currentLang].noData;
+    } finally {
+      tablesContainer.classList.remove('loading');
     }
+  }
 
     function getSelectedModels(){
       return Array.from(modelContainer.querySelectorAll('input[type=checkbox]:checked')).map(c=>c.value).slice(0,6);
@@ -162,28 +187,5 @@
           if(!s){ panel.appendChild(document.createTextNode(translations[currentLang].noData)); return }
           const table=document.createElement('table');
           const thead=document.createElement('thead');
-          thead.innerHTML='<tr><th>Metric</th><th>Min</th><th>Avg</th><th>Max</th></tr>'; table.appendChild(thead);
-          const tbody=document.createElement('tbody');
-          const rows=[['Canvas','canvas'],['CanvasText','canvasText'],['Widget','widget'],['Widget2','widget2'],['Math','math'],['LS','ls'],['ES','es'],['ES BF','esBf']];
-          rows.forEach(r=>{
-            const tr=document.createElement('tr');
-            const tdLabel=document.createElement('td'); tdLabel.textContent=r[0];
-            const tdMin=document.createElement('td'); tdMin.textContent=s[r[1]]?s[r[1]].min:'-';
-            const tdAvg=document.createElement('td'); tdAvg.textContent=s[r[1]]?s[r[1]].avg:'-';
-            const tdMax=document.createElement('td'); tdMax.textContent=s[r[1]]?s[r[1]].max:'-';
-            tr.append(tdLabel,tdMin,tdAvg,tdMax); tbody.appendChild(tr);
-          });
-          table.appendChild(tbody); panel.appendChild(table);
-        })();
-      }
-      tablesContainer.appendChild(panels);
-      tablesContainer.classList.remove('loading');
-    }
 
-    refreshBtn.addEventListener('click', refreshStats);
-    clearBtn.addEventListener('click',()=>{ modelContainer.querySelectorAll('input[type=checkbox]').forEach(c=>c.checked=false); tablesContainer.innerHTML=''; });
-
-    loadModels();
-  </script>
-</body>
-</html>
+      
