@@ -105,7 +105,7 @@
     <div class="logo">
       <div class="icon">Δ</div>
       <div>
-        <div class="brand" id="title">Device Test Statistics</div>
+        <div class="brand" id="title">Device testing statistics in the ZeppBench app</div>
         <div class="muted" id="subtitle">Live aggregated metrics from Google Sheets</div>
       </div>
     </div>
@@ -149,12 +149,12 @@
   <!-- Chart -->
   <section class="card">
     <h3 id="chartHeading">Histogram</h3>
-    <div id="chartContainer">Загрузка...</div>
+    <div id="chartContainer">Loading...</div>
   </section>
 
   <!-- Footer -->
   <div class="footer" id="footer">
-    Powered by Google Sheets • Data shown only for <strong>prod</strong> mode.
+    Developed by SashaCX75 • Powered by Google Sheets.
   </div>
 </div>
 
@@ -172,29 +172,39 @@ const langSelect=document.getElementById("lang");
 let cache={}, chart;
 
 // ===== TRANSLATIONS =====
+const labelTranslations={
+  en:["Canvas shape\ndrawing test","Canvas text\ndrawing test","Widget\ncreation test","Widget\ncreation test #2","Math\nfunctions test","LocalStorage\nread/write test","EasyStorage\nfile I/O test","EasyStorage big\nfile I/O test"],
+  ru:["Тест скорости\nрисования фигур\nна холсте","Тест скорости\nрисования текста\nна холсте","Тест скорости\nсоздания виджетов","Тест скорости\nсоздания виджетов №2","Тест вычисления\nматематических функций","Тестирование скорости\nчтения/записи в localStorage","Тестирование скорости\nчтения/записи файлов\nв EasyStorage","Тестирование скорости\nчтения/записи больших\nфайлов"],
+  uk:["Тест швидкості\nмалювання фігур\nна canvas","Тест швидкості\nмалювання тексту\nна canvas","Тест швидкості\nстворення віджетів","Тест швидкості\nстворення віджетів №2","Тест обчислення\nматематичних функцій","Тест швидкості\nчитання/запису в localStorage","Тест швидкості\nчитання/запису файлів\nв EasyStorage","Тест швидкості\nчитання/запису великих\nфайлів"]
+};
 const t={
   en:{
+    title:"Device testing statistics in the ZeppBench app", subtitle:"Live aggregated metrics from Google Sheets",
     sortHeading:"Model sorting", sortName:"By name", sortDesc:"By test count (↓)", sortAsc:"By test count (↑)",
-    modelsHeading:"Select models",
-    metricHeading:"Comparison type", metricMin:"Minimum values", metricAvg:"Average values", metricMax:"Maximum values",
-    chartHeading:"Histogram"
+    modelsHeading:"Select models", testCount: "number of tests",
+    metricHeading:"Select which values to compare", metricMin:"Minimum values", metricAvg:"Average values", metricMax:"Maximum values",
+    chartHeading:"Comparison results", chartContainer:"Loading...", noData:"No data", selectModels:"Select at least 2 models"
   },
   ru:{
+    title:"Статистика тестирования устройств в приложении ZeppBench", subtitle:"Агрегированные показатели в реальном времени из Google Sheets",
     sortHeading:"Сортировка моделей", sortName:"По имени", sortDesc:"По числу тестов (↓)", sortAsc:"По числу тестов (↑)",
-    modelsHeading:"Выберите модели",
-    metricHeading:"Тип сравнения", metricMin:"Минимальные значения", metricAvg:"Средние значения", metricMax:"Максимальные значения",
-    chartHeading:"Гистограмма"
+    modelsHeading:"Выберите модели", testCount: "число тестов",
+    metricHeading:"Выберите какие значения сравнивать", metricMin:"Минимальные значения", metricAvg:"Средние значения", metricMax:"Максимальные значения",
+    chartHeading:"Результаты сравнения", chartContainer:"Загрузка...", noData:"Нет данных", selectModels:"Выберите хотя бы 2 модели"
   },
   uk:{
+    title:"Статистика тестування пристроїв у додатку ZeppBench", subtitle:"Агреговані показники в режимі реального часу з Google Sheets",
     sortHeading:"Сортування моделей", sortName:"За назвою", sortDesc:"За кількістю тестів (↓)", sortAsc:"За кількістю тестів (↑)",
-    modelsHeading:"Оберіть моделі",
-    metricHeading:"Тип порівняння", metricMin:"Мінімальні значення", metricAvg:"Середні значення", metricMax:"Максимальні значення",
-    chartHeading:"Гістограма"
+    modelsHeading:"Оберіть моделі", testCount: "кількість тестів",
+    metricHeading:"Виберіть які значення порівнювати", metricMin:"Мінімальні значення", metricAvg:"Середні значення", metricMax:"Максимальні значення",
+    chartHeading:"Результати порівняння", chartContainer:"Завантаження...", noData:"Немає даних", selectModels:"Виберіть хоча б 2 моделі"
   }
 };
 
 function applyLang(){
   const lang=langSelect.value;
+  document.getElementById("title").textContent=t[lang].title;
+  document.getElementById("subtitle").textContent=t[lang].subtitle;
   document.getElementById("sortHeading").textContent=t[lang].sortHeading;
   document.getElementById("sortName").textContent=t[lang].sortName;
   document.getElementById("sortDesc").textContent=t[lang].sortDesc;
@@ -205,25 +215,44 @@ function applyLang(){
   document.getElementById("metricAvg").textContent=t[lang].metricAvg;
   document.getElementById("metricMax").textContent=t[lang].metricMax;
   document.getElementById("chartHeading").textContent=t[lang].chartHeading;
+  document.getElementById("chartContainer").textContent=t[lang].chartContainer;
+
+  // обновляем надписи в списке моделей
+  document.querySelectorAll("#modelContainer small").forEach(el => {
+	const count = el.dataset.count;
+	el.textContent = `(${t[langSelect.value].testCount}: ${count})`;
+  });
 }
+
 
 // ===== LOCAL STORAGE =====
 function savePrefs(){
-  const models=getSelectedModels();
-  localStorage.setItem("theme",document.body.classList.contains("light")?"light":"dark");
-  localStorage.setItem("lang",langSelect.value);
-  localStorage.setItem("metric",metricGroup.querySelector("input:checked").value);
-  localStorage.setItem("models",JSON.stringify(models));
+  const models = getSelectedModels();
+  localStorage.setItem("theme", document.body.classList.contains("light") ? "light" : "dark");
+  localStorage.setItem("lang", langSelect.value);
+  localStorage.setItem("metric", metricGroup.querySelector("input:checked").value);
+  localStorage.setItem("models", JSON.stringify(models));
 }
+
 function loadPrefs(){
-  const theme=localStorage.getItem("theme");
+  // тема
+  const theme = localStorage.getItem("theme");
   if(theme){
     document.body.classList.remove("light","dark");
     document.body.classList.add(theme);
-    themeToggle.textContent=theme==="light"?"☀️":"🌙";
+    themeToggle.textContent = theme==="light" ? "☀️" : "🌙";
   }
-  const lang=localStorage.getItem("lang");
-  if(lang) langSelect.value=lang;
+
+  // язык
+  let lang = localStorage.getItem("lang");
+  if(!lang){  
+    // автоопределение по браузеру
+    const browserLang = navigator.language.slice(0,2);
+    if(["ru","uk","en"].includes(browserLang)) lang = browserLang;
+    else lang = "en"; // по умолчанию
+    localStorage.setItem("lang", lang);
+  }
+  langSelect.value = lang;
   applyLang();
 }
 
@@ -233,12 +262,12 @@ themeToggle.addEventListener("click",()=>{
   document.body.classList.toggle("dark");
   themeToggle.textContent=document.body.classList.contains("light")?"☀️":"🌙";
   savePrefs();
-  if(chart) chart.update();
+  if(chart) {chart.update(); refreshChart();}
 });
 
 // ===== MODELS =====
 async function loadModels(){
-  chartContainer.textContent="Загрузка...";
+  chartContainer.textContent=t[langSelect.value].chartContainer;
   const res=await fetch(BASE+"?modelsOnly=true");
   const j=await res.json();
   let models=j.models||[];
@@ -258,26 +287,18 @@ async function loadModels(){
     const span=document.createElement("span");
     span.textContent=name;
     const small=document.createElement("small");
-    small.textContent=`(число тестов: ${count})`;
+	small.dataset.count = count; // сохраняем число тестов отдельно
+    small.textContent=`(${t[langSelect.value].testCount}: ${count})`;
     wrap.appendChild(span);
     wrap.appendChild(small);
     lbl.appendChild(wrap);
     modelContainer.appendChild(lbl);
   });
 
-  // Restore selection
-  const savedModels=JSON.parse(localStorage.getItem("models")||"[]");
-  if(savedModels.length){
-    savedModels.forEach(sm=>{
-      const cb=modelContainer.querySelector(`input[value="${sm}"]`);
-      if(cb) cb.checked=true;
-    });
-  } else {
-    const boxes=modelContainer.querySelectorAll("input[type=checkbox]");
-    if(boxes.length){
-      boxes[0].checked=true;
-      boxes.forEach(b=>{if(b.value==="Balance 2") b.checked=true;});
-    }
+  const boxes=modelContainer.querySelectorAll("input[type=checkbox]");
+  if(boxes.length){
+    boxes[0].checked=true;
+    boxes.forEach(b=>{if(b.value==="Balance 2") b.checked=true;});
   }
 
   refreshChart();
@@ -299,14 +320,13 @@ async function fetchModelStats(model){
 // ===== CHART =====
 async function refreshChart(){
   const models=getSelectedModels();
-  if(models.length<2){chartContainer.textContent="Выберите хотя бы 2 модели";return;}
-  chartContainer.textContent="Загрузка...";
+  if(models.length<2){chartContainer.textContent=t[langSelect.value].selectModels;return;}
+  chartContainer.textContent=t[langSelect.value].chartContainer;
 
   const metric=metricGroup.querySelector("input:checked").value;
-  const labels=["Canvas","CanvasText","Widget","Widget2","Math","LS","ES","ES BF"];
   const keys=["canvas","canvasText","widget","widget2","math","ls","es","esBf"];
+  const labels=labelTranslations[langSelect.value]||labelTranslations.en;
 
-  // Цвета под тему
   const lightColors=["#1565c0","#ad1457","#ef6c00","#2e7d32","#c2185b","#6a1b9a","#0277bd","#d84315"];
   const darkColors=["#42a5f5","#f06292","#ffb74d","#81c784","#f48fb1","#ba68c8","#64b5f6","#ff8a65"];
   const colors=document.body.classList.contains("light")?lightColors:darkColors;
@@ -319,9 +339,8 @@ async function refreshChart(){
   }
 
   const modelNames=Object.keys(dataByModel);
-  if(!modelNames.length){chartContainer.textContent="Нет данных";return;}
+  if(!modelNames.length){chartContainer.textContent=t[langSelect.value].noData;return;}
 
-  // Нормализация по каждому параметру
   const maxPerKey=keys.map((_,i)=>Math.max(...modelNames.map(m=>dataByModel[m][i]||0)));
   const normalizedByModel={};
   modelNames.forEach(m=>{
@@ -332,57 +351,89 @@ async function refreshChart(){
     label:m,
     data:normalizedByModel[m],
     backgroundColor:colors[i%colors.length],
-    barThickness:12
+    barThickness:14
   }));
+
+  const groupFactor=Math.max(0.6,1-models.length*0.08);
 
   chartContainer.innerHTML='<canvas id="chart"></canvas>';
   const ctx=document.getElementById("chart").getContext("2d");
   if(chart) chart.destroy();
   chart=new Chart(ctx,{
-    type:"bar",
-    data:{labels:labels,datasets:datasets},
-    options:{
-      indexAxis:"y",
-      responsive:true,
-      plugins:{
-        legend:{position:"bottom"},
-        tooltip:{
-          callbacks:{
-            label:(ctx)=>{
-              const v=ctx.raw;
-              return v.toFixed(1)+"%";
-            }
-          }
-        },
-        datalabels:{
-          anchor:"end",
-          align:"start",
-          color:document.body.classList.contains("light")?"#000":"#fff",
-          formatter:v=>v.toFixed(1)+"%"
-        }
-      },
-      scales:{
-        x:{
-          beginAtZero:true,
-          max:100,
-          ticks:{display:false}
-        }
-      }
-    },
-    plugins:[ChartDataLabels]
-  });
+	  type:"bar",
+	  data:{labels:labels,datasets:datasets},
+	  options:{
+		indexAxis:"y",
+		responsive:true,
+		plugins:{
+		  legend:{position:"bottom"},
+		  tooltip:{
+			callbacks:{
+			  label:(ctx)=>{
+				const v=ctx.raw;
+				return v.toFixed(1)+"%";
+			  }
+			}
+		  },
+		  datalabels:{
+			  anchor:"end",       // текст справа от полосы
+			  align:"right",      // справа от полосы
+			  color:document.body.classList.contains("light")?"#000":"#fff",
+			  formatter:(v, ctx)=>{
+				// Берем оригинальное значение из dataByModel, не нормализованное
+				const model = ctx.dataset.label;
+				const index = ctx.dataIndex;
+				const key = keys[index];
+				const originalValue = dataByModel[model][index] || 0;
+				return originalValue;
+			  }
+			}
+		},
+		scales:{
+		  x:{
+			beginAtZero:true,
+			max:110, // оставляем место для подписей
+			ticks:{display:false}
+		  },
+		  y:{
+			ticks:{
+			  callback:function(value,index){
+				const label=this.getLabelForValue(value);
+				// Разбиваем длинные подписи на строки через пробелы
+				const maxLineLength = 20; // символов на строку
+				if(label.length > maxLineLength){
+				  let result = [];
+				  let words = label.split(" ");
+				  let line = "";
+				  for(const w of words){
+					if((line+w).length > maxLineLength){
+					  result.push(line.trim());
+					  line = w + " ";
+					} else {
+					  line += w + " ";
+					}
+				  }
+				  result.push(line.trim());
+				  return result; // массив = несколько строк
+				}
+				return label;
+			  }
+			}
+		  }
+		}
+	  },
+	  plugins:[ChartDataLabels]
+	});
 
-  savePrefs();
 }
 
 // ===== EVENTS =====
-sortGroup.addEventListener("change",()=>{loadModels(); savePrefs();});
-metricGroup.addEventListener("change",()=>{refreshChart(); savePrefs();});
-modelContainer.addEventListener("change",()=>{refreshChart(); savePrefs();});
-langSelect.addEventListener("change",()=>{applyLang(); savePrefs();});
+sortGroup.addEventListener("change",()=>{loadModels();});
+metricGroup.addEventListener("change",()=>{refreshChart();});
+modelContainer.addEventListener("change",()=>{refreshChart();});
+langSelect.addEventListener("change",()=>{applyLang(); savePrefs(); refreshChart();});
 
 // ===== INIT =====
-loadPrefs();
 loadModels();
 </script>
 </body>
