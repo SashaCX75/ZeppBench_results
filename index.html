@@ -173,7 +173,7 @@ let cache={}, chart;
 
 // ===== TRANSLATIONS =====
 const labelTranslations={
-  en:["Canvas shape\ndrawing test","Canvas text\ndrawing test","Widget\ncreation test","Widget\ncreation test #2","Math\nfunctions test","LocalStorage\nread/write test","EasyStorage\nfile I/O test","EasyStorage big\nfile I/O test"],
+  en:["Canvas shape\ndrawing test","Canvas text\ndrawing test","Widget\ncreation test","Widget\ncreation test #2","Math\nfunctions test","LocalStorage\nread/write test","EasyStorage file\nread/write test","EasyStorage big file\nread/write test"],
   ru:["Тест скорости\nрисования фигур\nна холсте","Тест скорости\nрисования текста\nна холсте","Тест скорости\nсоздания виджетов","Тест скорости\nсоздания виджетов №2","Тест вычисления\nматематических функций","Тестирование скорости\nчтения/записи в localStorage","Тестирование скорости\nчтения/записи файлов\nв EasyStorage","Тестирование скорости\nчтения/записи больших\nфайлов"],
   uk:["Тест швидкості\nмалювання фігур\nна canvas","Тест швидкості\nмалювання тексту\nна canvas","Тест швидкості\nстворення віджетів","Тест швидкості\nстворення віджетів №2","Тест обчислення\nматематичних функцій","Тест швидкості\nчитання/запису в localStorage","Тест швидкості\nчитання/запису файлів\nв EasyStorage","Тест швидкості\nчитання/запису великих\nфайлів"]
 };
@@ -226,34 +226,52 @@ function applyLang(){
 
 
 // ===== LOCAL STORAGE =====
-function savePrefs(){
+function savePrefs() {
   const models = getSelectedModels();
-  localStorage.setItem("theme", document.body.classList.contains("light") ? "light" : "dark");
-  localStorage.setItem("lang", langSelect.value);
-  localStorage.setItem("metric", metricGroup.querySelector("input:checked").value);
+  const theme = document.body.classList.contains("light") ? "light" : "dark";
+  const lang = langSelect.value;
+  const metric = metricGroup.querySelector("input:checked")?.value || "avg";
+
+  localStorage.setItem("theme", theme);
+  localStorage.setItem("lang", lang);
+  localStorage.setItem("metric", metric);
   localStorage.setItem("models", JSON.stringify(models));
+
+  console.log("[savePrefs]", { theme, lang, metric, models });
 }
 
-function loadPrefs(){
-  // тема
+function loadPrefs() {
+  // ===== Theme =====
   const theme = localStorage.getItem("theme");
-  if(theme){
-    document.body.classList.remove("light","dark");
+  if (theme) {
+    document.body.classList.remove("light", "dark");
     document.body.classList.add(theme);
-    themeToggle.textContent = theme==="light" ? "☀️" : "🌙";
+    themeToggle.textContent = theme === "light" ? "☀️" : "🌙";
   }
 
-  // язык
+  // ===== Language =====
   let lang = localStorage.getItem("lang");
-  if(!lang){  
-    // автоопределение по браузеру
-    const browserLang = navigator.language.slice(0,2);
-    if(["ru","uk","en"].includes(browserLang)) lang = browserLang;
-    else lang = "en"; // по умолчанию
+  if (!lang) {
+    lang = (navigator.language || "en").substring(0, 2);
+    if (!["en", "ru", "uk"].includes(lang)) lang = "en";
     localStorage.setItem("lang", lang);
   }
   langSelect.value = lang;
   applyLang();
+
+  // ===== Metric =====
+  const metric = localStorage.getItem("metric");
+  if (metric) {
+    const radio = metricGroup.querySelector(`input[value="${metric}"]`);
+    if (radio) radio.checked = true;
+  }
+
+  // ===== Models =====
+  const savedModels = JSON.parse(localStorage.getItem("models") || "[]");
+
+  console.log("[loadPrefs]", { theme, lang, metric, savedModels });
+
+  return { theme, lang, metric, savedModels };
 }
 
 // ===== THEME =====
@@ -264,6 +282,9 @@ themeToggle.addEventListener("click",()=>{
   savePrefs();
   if(chart) {chart.update(); refreshChart();}
 });
+
+// ===== INIT =====
+const prefs = loadPrefs();  // сначала загрузили настройки
 
 // ===== MODELS =====
 async function loadModels(){
@@ -320,7 +341,10 @@ async function fetchModelStats(model){
 // ===== CHART =====
 async function refreshChart(){
   const models=getSelectedModels();
-  if(models.length<2){chartContainer.textContent=t[langSelect.value].selectModels;return;}
+  if(models.length<2){
+	chartContainer.textContent=t[langSelect.value].selectModels;
+	return;
+  }
   chartContainer.textContent=t[langSelect.value].chartContainer;
 
   const metric=metricGroup.querySelector("input:checked").value;
@@ -339,7 +363,10 @@ async function refreshChart(){
   }
 
   const modelNames=Object.keys(dataByModel);
-  if(!modelNames.length){chartContainer.textContent=t[langSelect.value].noData;return;}
+  if(!modelNames.length){
+	chartContainer.textContent=t[langSelect.value].noData;
+	return;
+  }
 
   const maxPerKey=keys.map((_,i)=>Math.max(...modelNames.map(m=>dataByModel[m][i]||0)));
   const normalizedByModel={};
@@ -351,13 +378,27 @@ async function refreshChart(){
     label:m,
     data:normalizedByModel[m],
     backgroundColor:colors[i%colors.length],
-    barThickness:14
+    //barThickness:18
+	//barThickness:"flex"
   }));
 
-  const groupFactor=Math.max(0.6,1-models.length*0.08);
+  //const groupFactor=Math.max(0.8,1-models.length*0.08);
+  //console.log("groupFactor: ", groupFactor);
 
-  chartContainer.innerHTML='<canvas id="chart"></canvas>';
-  const ctx=document.getElementById("chart").getContext("2d");
+    const numKeys = 8; // число категорий/ключей
+    const barHeight = 8; // высота каждой полосы в px
+    const gapBetweenModels = 6; // расстояние между наборами полос
+
+    const totalHeight = numKeys * models.length * (barHeight + gapBetweenModels);
+
+    // Обновляем контейнер и canvas
+    chartContainer.innerHTML = '<canvas id="chart"></canvas>';
+    const canvas = document.getElementById("chart");
+    canvas.height = totalHeight; // задаём динамическую высоту
+    const ctx = canvas.getContext("2d");
+
+  //chartContainer.innerHTML='<canvas id="chart"></canvas>';
+  //const ctx=document.getElementById("chart").getContext("2d");
   if(chart) chart.destroy();
   chart=new Chart(ctx,{
 	  type:"bar",
@@ -396,6 +437,8 @@ async function refreshChart(){
 			ticks:{display:false}
 		  },
 		  y:{
+			//categoryPercentage: 0.2, // ширина группы
+			//barPercentage: 0.2,       // ширина каждой полосы
 			ticks:{
 			  callback:function(value,index){
 				const label=this.getLabelForValue(value);
