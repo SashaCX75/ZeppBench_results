@@ -4,6 +4,7 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>Device Test Statistics</title>
+  <link rel="icon" href="images/favicon.ico" type="image/x-icon">
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels"></script>
   <style>
@@ -36,12 +37,12 @@
     .brand {font-weight:700; font-size:20px;}
     .icon {
       width:48px; height:48px;
-      border-radius:10px;
-      background:linear-gradient(135deg,#007acc,#00c4ff);
+      /* border-radius:10px;
+      background:linear-gradient(135deg,#007acc,#00c4ff); */
       display:grid; place-items:center;
       box-shadow:0 6px 18px rgba(0,0,0,.5);
-      font-size:22px; font-weight:bold;
-      color:white;
+      /* font-size:22px; font-weight:bold;
+      color:white; */
     }
     .top-actions {
       margin-left:auto;
@@ -103,7 +104,9 @@
   <!-- Header -->
   <header>
     <div class="logo">
-      <div class="icon">Δ</div>
+      <div class="icon">
+        <img src="images/my-logo.png" alt="Logo" style="width:100%; height:100%; border-radius:10px; object-fit:cover;">
+      </div>
       <div>
         <div class="brand" id="title">Device testing statistics in the ZeppBench app</div>
         <div class="muted" id="subtitle">Live aggregated metrics from Google Sheets</div>
@@ -134,6 +137,9 @@
   <section class="card">
     <h3 id="modelsHeading">Select models</h3>
     <div class="models-list" id="modelsContainer"></div>
+	<div id="totalTests" class="muted" style="margin-top:8px; font-size:14px;">
+	  Total tests: 0
+	</div>
   </section>
 
   <!-- Metric -->
@@ -180,21 +186,21 @@ const labelTranslations={
 const t={
   en:{
     title:"Device testing statistics in the ZeppBench app", subtitle:"Live aggregated metrics from Google Sheets",
-    sortHeading:"Model sorting", sortName:"By name", sortDesc:"By test count (↓)", sortAsc:"By test count (↑)",
+    sortHeading:"Model sorting", totalTests: "Total tests: ", sortName:"By name", sortDesc:"By test count (↓)", sortAsc:"By test count (↑)",
     modelsHeading:"Select models", testCount: "number of tests",
     metricHeading:"Select which values to compare", metricMin:"Minimum values", metricAvg:"Average values", metricMax:"Maximum values",
     chartHeading:"Comparison results", chartContainer:"Loading...", noData:"No data", selectModels:"Select at least 2 models"
   },
   ru:{
     title:"Статистика тестирования устройств в приложении ZeppBench", subtitle:"Агрегированные показатели в реальном времени из Google Sheets",
-    sortHeading:"Сортировка моделей", sortName:"По имени", sortDesc:"По числу тестов (↓)", sortAsc:"По числу тестов (↑)",
+    sortHeading:"Сортировка моделей", totalTests: "Общее число тестов: ", sortName:"По имени", sortDesc:"По числу тестов (↓)", sortAsc:"По числу тестов (↑)",
     modelsHeading:"Выберите модели", testCount: "число тестов",
     metricHeading:"Выберите какие значения сравнивать", metricMin:"Минимальные значения", metricAvg:"Средние значения", metricMax:"Максимальные значения",
     chartHeading:"Результаты сравнения", chartContainer:"Загрузка...", noData:"Нет данных", selectModels:"Выберите хотя бы 2 модели"
   },
   uk:{
     title:"Статистика тестування пристроїв у додатку ZeppBench", subtitle:"Агреговані показники в режимі реального часу з Google Sheets",
-    sortHeading:"Сортування моделей", sortName:"За назвою", sortDesc:"За кількістю тестів (↓)", sortAsc:"За кількістю тестів (↑)",
+    sortHeading:"Сортування моделей", totalTests: "Загальна кількість тестів: ", sortName:"За назвою", sortDesc:"За кількістю тестів (↓)", sortAsc:"За кількістю тестів (↑)",
     modelsHeading:"Оберіть моделі", testCount: "кількість тестів",
     metricHeading:"Виберіть які значення порівнювати", metricMin:"Мінімальні значення", metricAvg:"Середні значення", metricMax:"Максимальні значення",
     chartHeading:"Результати порівняння", chartContainer:"Завантаження...", noData:"Немає даних", selectModels:"Виберіть хоча б 2 моделі"
@@ -206,6 +212,7 @@ function applyLang(){
   document.getElementById("title").textContent=t[lang].title;
   document.getElementById("subtitle").textContent=t[lang].subtitle;
   document.getElementById("sortHeading").textContent=t[lang].sortHeading;
+  document.getElementById("totalTests").textContent=t[lang].totalTests;
   document.getElementById("sortName").textContent=t[lang].sortName;
   document.getElementById("sortDesc").textContent=t[lang].sortDesc;
   document.getElementById("sortAsc").textContent=t[lang].sortAsc;
@@ -231,13 +238,15 @@ function savePrefs() {
   const theme = document.body.classList.contains("light") ? "light" : "dark";
   const lang = langSelect.value;
   const metric = metricGroup.querySelector("input:checked")?.value || "avg";
+  const modelSort = sortGroup.querySelector("input:checked")?.value || "name";
 
   localStorage.setItem("theme", theme);
   localStorage.setItem("lang", lang);
   localStorage.setItem("metric", metric);
+  localStorage.setItem("modelSort", modelSort);
   localStorage.setItem("models", JSON.stringify(models));
 
-  console.log("[savePrefs]", { theme, lang, metric, models });
+  console.log("[savePrefs]", { theme, lang, metric, models, modelSort });
 }
 
 function loadPrefs() {
@@ -259,6 +268,13 @@ function loadPrefs() {
   langSelect.value = lang;
   applyLang();
 
+  // ===== Sort model =====
+ const modelSort = localStorage.getItem("modelSort");
+ if (modelSort) {
+	const radio = sortGroup.querySelector(`input[value="${modelSort}"]`);
+	if (radio) radio.checked = true;
+ }
+
   // ===== Metric =====
   const metric = localStorage.getItem("metric");
   if (metric) {
@@ -269,7 +285,7 @@ function loadPrefs() {
   // ===== Models =====
   const savedModels = JSON.parse(localStorage.getItem("models") || "[]");
 
-  console.log("[loadPrefs]", { theme, lang, metric, savedModels });
+  console.log("[loadPrefs]", { theme, lang, modelSort, metric, savedModels });
 
   return { theme, lang, metric, savedModels };
 }
@@ -323,6 +339,15 @@ async function loadModels(){
   }
 
   refreshChart();
+  updateTotalTests();
+}
+
+function updateTotalTests() {
+  let total = 0;
+  modelContainer.querySelectorAll("small").forEach(small => {
+    total += parseInt(small.dataset.count) || 0;
+  });
+  document.getElementById("totalTests").textContent = `Total tests: ${total}`;
 }
 
 function getSelectedModels(){
@@ -471,8 +496,8 @@ async function refreshChart(){
 }
 
 // ===== EVENTS =====
-sortGroup.addEventListener("change",()=>{loadModels();});
-metricGroup.addEventListener("change",()=>{refreshChart();});
+sortGroup.addEventListener("change",()=>{loadModels(); savePrefs();});
+metricGroup.addEventListener("change",()=>{refreshChart(); savePrefs();});
 modelContainer.addEventListener("change",()=>{refreshChart();});
 langSelect.addEventListener("change",()=>{applyLang(); savePrefs(); refreshChart();});
 
