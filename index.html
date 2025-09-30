@@ -51,6 +51,15 @@
       align-items:center;
     }
     .theme-toggle {cursor:pointer; font-size:20px;}
+	.lang-flag {
+	  width: 24px;
+	  height: 18px;
+	  object-fit: cover;
+	  border-radius: 2px;
+	  vertical-align: middle;
+	  box-shadow: 0 1px 2px rgba(0,0,0,0.15);
+	  margin-right: 6px;
+	}
 
     /* ===== BLOCKS ===== */
     .card {
@@ -114,7 +123,9 @@
     </div>
     <div class="top-actions">
       <span class="theme-toggle" id="themeToggle" title="Toggle theme">🌙</span>
-      <label for="lang">🌐</label>
+      <label for="lang" title="Language">
+		  <img id="langIcon" class="lang-flag" src="images/flags/en.svg" alt="en" width="24" height="16" />
+      </label>
       <select id="lang">
         <option value="en">English</option>
         <option value="ru">Русский</option>
@@ -178,6 +189,11 @@ const langSelect=document.getElementById("lang");
 let cache={}, chart;
 
 // ===== TRANSLATIONS =====
+const icon = {
+  en: 'images/flags/en.png',
+  uk: 'images/flags/uk.png',
+  ru: 'images/flags/ru.png'
+};
 const labelTranslations={
   en:["Canvas shape\ndrawing test","Canvas text\ndrawing test","Widget\ncreation test","Widget\ncreation test #2","Math\nfunctions test","LocalStorage\nread/write test","EasyStorage file\nread/write test","EasyStorage big file\nread/write test"],
   ru:["Тест скорости\nрисования фигур\nна холсте","Тест скорости\nрисования текста\nна холсте","Тест скорости\nсоздания виджетов","Тест скорости\nсоздания виджетов №2","Тест вычисления\nматематических функций","Тестирование скорости\nчтения/записи в localStorage","Тестирование скорости\nчтения/записи файлов\nв EasyStorage","Тестирование скорости\nчтения/записи больших\nфайлов"],
@@ -212,7 +228,7 @@ function applyLang(){
   document.getElementById("title").textContent=t[lang].title;
   document.getElementById("subtitle").textContent=t[lang].subtitle;
   document.getElementById("sortHeading").textContent=t[lang].sortHeading;
-  document.getElementById("totalTests").textContent=t[lang].totalTests;
+  // document.getElementById("totalTests").textContent=t[lang].totalTests;
   document.getElementById("sortName").textContent=t[lang].sortName;
   document.getElementById("sortDesc").textContent=t[lang].sortDesc;
   document.getElementById("sortAsc").textContent=t[lang].sortAsc;
@@ -223,12 +239,21 @@ function applyLang(){
   document.getElementById("metricMax").textContent=t[lang].metricMax;
   document.getElementById("chartHeading").textContent=t[lang].chartHeading;
   document.getElementById("chartContainer").textContent=t[lang].chartContainer;
+  
+  const langIcon = document.getElementById('langIcon');
+	if (langIcon) {
+	  langIcon.src = icon[lang] || icon.en;
+	  langIcon.alt = lang;
+	  // опционально: подтекст при hover
+	  langIcon.title = (lang === 'en' ? 'English' : lang === 'ru' ? 'Русский' : 'Українська');
+	}
 
   // обновляем надписи в списке моделей
   document.querySelectorAll("#modelContainer small").forEach(el => {
-	const count = el.dataset.count;
-	el.textContent = `(${t[langSelect.value].testCount}: ${count})`;
+    const count = el.dataset.count;
+    el.textContent = `(${t[langSelect.value].testCount}: ${count})`;
   });
+  updateTotalTests();
 }
 
 
@@ -347,7 +372,7 @@ function updateTotalTests() {
   modelContainer.querySelectorAll("small").forEach(small => {
     total += parseInt(small.dataset.count) || 0;
   });
-  document.getElementById("totalTests").textContent = `Total tests: ${total}`;
+  document.getElementById("totalTests").textContent = t[langSelect.value].totalTests + total;
 }
 
 function getSelectedModels(){
