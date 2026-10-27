@@ -124,7 +124,7 @@
       </div>
       <div>
         <div class="brand" id="title">Device testing statistics in the ZeppBench app</div>
-        <div class="muted" id="subtitle">Live aggregated metrics from Google Sheets</div>
+        <div class="muted" id="subtitle">Live aggregated metrics from Supabase</div>
       </div>
     </div>
     <div class="top-actions">
@@ -177,13 +177,23 @@
 
   <!-- Footer -->
   <div class="footer" id="footer">
-    Developed by SashaCX75 • Powered by Google Sheets.
+    Developed by SashaCX75 • Powered by Supabase.
   </div>
 </div>
 
 <script>
-const SCRIPT_ID="AKfycbym44b2BGJkK01Dq3d6tL0VRB_q-_vOq1FMmHuIJvzdhW2nrE6170-emrlNhe140xmEug";
-const BASE="https://script.google.com/macros/s/"+SCRIPT_ID+"/exec";
+const SUPABASE_URL="https://vstpwwvyuiuzmhhapbqz.supabase.co";
+const SUPABASE_KEY="sb_publishable_AZqHGXin5xNSo_jG7Y96Qw_PfvKZSDo";
+
+async function rpc(name,params={}){
+  const res=await fetch(`${SUPABASE_URL}/rest/v1/rpc/${name}`,{
+    method:"POST",
+    headers:{apikey:SUPABASE_KEY,"Content-Type":"application/json"},
+    body:JSON.stringify(params)
+  });
+  if(!res.ok) throw new Error(`rpc ${name}: ${res.status} ${await res.text()}`);
+  return res.json();
+}
 
 const modelContainer=document.getElementById("modelsContainer");
 const sortGroup=document.getElementById("sortGroup");
@@ -192,7 +202,7 @@ const chartContainer=document.getElementById("chartContainer");
 const themeToggle=document.getElementById("themeToggle");
 const langSelect=document.getElementById("lang");
 
-let cache={}, chart;
+let statsPromise=null, chart;
 
 // ===== TRANSLATIONS =====
 const icon = {
@@ -207,21 +217,21 @@ const labelTranslations={
 };
 const t={
   en:{
-    title:"Device testing statistics in the ZeppBench app", subtitle:"Live aggregated metrics from Google Sheets",
+    title:"Device testing statistics in the ZeppBench app", subtitle:"Live aggregated metrics from Supabase",
     sortHeading:"Model sorting", totalTests: "Total tests: ", sortName:"By name", sortDesc:"By test count (↓)", sortAsc:"By test count (↑)",
     modelsHeading:"Select models", testCount: "number of tests",
     metricHeading:"Select which values to compare", metricMin:"Minimum values", metricAvg:"Average values", metricMax:"Maximum values",
     chartHeading:"Comparison results", chartContainer:"Loading...", noData:"No data", selectModels:"Select at least 2 models"
   },
   ru:{
-    title:"Статистика тестирования устройств в приложении ZeppBench", subtitle:"Агрегированные показатели в реальном времени из Google Sheets",
+    title:"Статистика тестирования устройств в приложении ZeppBench", subtitle:"Агрегированные показатели в реальном времени из Supabase",
     sortHeading:"Сортировка моделей", totalTests: "Общее число тестов: ", sortName:"По имени", sortDesc:"По числу тестов (↓)", sortAsc:"По числу тестов (↑)",
     modelsHeading:"Выберите модели", testCount: "число тестов",
     metricHeading:"Выберите какие значения сравнивать", metricMin:"Минимальные значения", metricAvg:"Средние значения", metricMax:"Максимальные значения",
     chartHeading:"Результаты сравнения", chartContainer:"Загрузка...", noData:"Нет данных", selectModels:"Выберите хотя бы 2 модели"
   },
   uk:{
-    title:"Статистика тестування пристроїв у додатку ZeppBench", subtitle:"Агреговані показники в режимі реального часу з Google Sheets",
+    title:"Статистика тестування пристроїв у додатку ZeppBench", subtitle:"Агреговані показники в режимі реального часу з Supabase",
     sortHeading:"Сортування моделей", totalTests: "Загальна кількість тестів: ", sortName:"За назвою", sortDesc:"За кількістю тестів (↓)", sortAsc:"За кількістю тестів (↑)",
     modelsHeading:"Оберіть моделі", testCount: "кількість тестів",
     metricHeading:"Виберіть які значення порівнювати", metricMin:"Мінімальні значення", metricAvg:"Середні значення", metricMax:"Максимальні значення",
@@ -336,9 +346,15 @@ const prefs = loadPrefs();  // сначала загрузили настрой�
 // ===== MODELS =====
 async function loadModels(){
   chartContainer.textContent=t[langSelect.value].chartContainer;
-  const res=await fetch(BASE+"?modelsOnly=true");
-  const j=await res.json();
-  let models=j.models||[];
+  let models;
+  try{
+    const rows=await rpc("get_models");
+    models=rows.map(r=>({name:r.device_name,count:r.runs}));
+  }catch(e){
+    console.error("[loadModels]",e);
+    chartContainer.textContent=t[langSelect.value].noData;
+    return;
+  }
 
   const sortVal=sortGroup.querySelector("input:checked").value;
   if(sortVal==="name") models.sort((a,b)=>a.name.localeCompare(b.name));
@@ -385,13 +401,26 @@ function getSelectedModels(){
   return Array.from(modelContainer.querySelectorAll("input:checked")).map(c=>c.value).slice(0,6);
 }
 
+// Статистика всех моделей одним запросом, в старом формате:
+// { [device]: { canvas:{min,max,avg,median}, ..., count } }
+function loadAllStats(){
+  if(!statsPromise){
+    statsPromise=rpc("get_device_stats").then(rows=>{
+      const stats={};
+      rows.forEach(r=>{
+        const s=stats[r.device_name]||(stats[r.device_name]={count:0});
+        s[r.test]={min:r.min_value,max:r.max_value,avg:r.avg_value,median:r.median};
+        s.count=Math.max(s.count,r.runs);
+      });
+      return stats;
+    }).catch(e=>{statsPromise=null; throw e;}); // при ошибке повторим запрос в следующий раз
+  }
+  return statsPromise;
+}
+
 async function fetchModelStats(model){
-  if(cache[model]) return cache[model];
-  const res=await fetch(BASE+"?deviceName="+encodeURIComponent(model));
-  const j=await res.json();
-  const s=j.stats&&j.stats[model];
-  cache[model]=s||null;
-  return cache[model];
+  const stats=await loadAllStats();
+  return stats[model]||null;
 }
 
 // ===== CHART =====
@@ -412,10 +441,16 @@ async function refreshChart(){
   const colors=document.body.classList.contains("light")?lightColors:darkColors;
 
   const dataByModel={};
-  for(const model of models){
-    const stats=await fetchModelStats(model);
-    if(!stats) continue;
-    dataByModel[model]=keys.map(k=>stats[k]?stats[k][metric]:0);
+  try{
+    for(const model of models){
+      const stats=await fetchModelStats(model);
+      if(!stats) continue;
+      dataByModel[model]=keys.map(k=>stats[k]?stats[k][metric]:0);
+    }
+  }catch(e){
+    console.error("[refreshChart]",e);
+    chartContainer.textContent=t[langSelect.value].noData;
+    return;
   }
 
   const modelNames=Object.keys(dataByModel);
