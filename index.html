@@ -184,6 +184,7 @@
 <script>
 const SUPABASE_URL="https://vstpwwvyuiuzmhhapbqz.supabase.co";
 const SUPABASE_KEY="sb_publishable_AZqHGXin5xNSo_jG7Y96Qw_PfvKZSDo";
+const MODE="prod"; // в статистику попадают только записи с этим mode
 
 async function rpc(name,params={}){
   const res=await fetch(`${SUPABASE_URL}/rest/v1/rpc/${name}`,{
@@ -218,21 +219,21 @@ const labelTranslations={
 const t={
   en:{
     title:"Device testing statistics in the ZeppBench app", subtitle:"Live aggregated metrics from Supabase",
-    sortHeading:"Model sorting", totalTests: "Total tests: ", sortName:"By name", sortDesc:"By test count (↓)", sortAsc:"By test count (↑)",
+    sortHeading:"Model sorting", totalTests: "Total tests: ", totalModels: "Models: ", sortName:"By name", sortDesc:"By test count (↓)", sortAsc:"By test count (↑)",
     modelsHeading:"Select models", testCount: "number of tests",
     metricHeading:"Select which values to compare", metricMin:"Minimum values", metricAvg:"Average values", metricMax:"Maximum values",
     chartHeading:"Comparison results", chartContainer:"Loading...", noData:"No data", selectModels:"Select at least 2 models"
   },
   ru:{
     title:"Статистика тестирования устройств в приложении ZeppBench", subtitle:"Агрегированные показатели в реальном времени из Supabase",
-    sortHeading:"Сортировка моделей", totalTests: "Общее число тестов: ", sortName:"По имени", sortDesc:"По числу тестов (↓)", sortAsc:"По числу тестов (↑)",
+    sortHeading:"Сортировка моделей", totalTests: "Общее число тестов: ", totalModels: "Число моделей: ", sortName:"По имени", sortDesc:"По числу тестов (↓)", sortAsc:"По числу тестов (↑)",
     modelsHeading:"Выберите модели", testCount: "число тестов",
     metricHeading:"Выберите какие значения сравнивать", metricMin:"Минимальные значения", metricAvg:"Средние значения", metricMax:"Максимальные значения",
     chartHeading:"Результаты сравнения", chartContainer:"Загрузка...", noData:"Нет данных", selectModels:"Выберите хотя бы 2 модели"
   },
   uk:{
     title:"Статистика тестування пристроїв у додатку ZeppBench", subtitle:"Агреговані показники в режимі реального часу з Supabase",
-    sortHeading:"Сортування моделей", totalTests: "Загальна кількість тестів: ", sortName:"За назвою", sortDesc:"За кількістю тестів (↓)", sortAsc:"За кількістю тестів (↑)",
+    sortHeading:"Сортування моделей", totalTests: "Загальна кількість тестів: ", totalModels: "Кількість моделей: ", sortName:"За назвою", sortDesc:"За кількістю тестів (↓)", sortAsc:"За кількістю тестів (↑)",
     modelsHeading:"Оберіть моделі", testCount: "кількість тестів",
     metricHeading:"Виберіть які значення порівнювати", metricMin:"Мінімальні значення", metricAvg:"Середні значення", metricMax:"Максимальні значення",
     chartHeading:"Результати порівняння", chartContainer:"Завантаження...", noData:"Немає даних", selectModels:"Виберіть хоча б 2 моделі"
@@ -348,7 +349,7 @@ async function loadModels(){
   chartContainer.textContent=t[langSelect.value].chartContainer;
   let models;
   try{
-    const rows=await rpc("get_models");
+    const rows=await rpc("get_models",{p_mode:MODE});
     models=rows.map(r=>({name:r.device_name,count:r.runs}));
   }catch(e){
     console.error("[loadModels]",e);
@@ -394,10 +395,12 @@ async function loadModels(){
 
 function updateTotalTests() {
   let total = 0;
-  modelContainer.querySelectorAll("small").forEach(small => {
+  const smalls = modelContainer.querySelectorAll("small");
+  smalls.forEach(small => {
     total += parseInt(small.dataset.count) || 0;
   });
-  document.getElementById("totalTests").textContent = t[langSelect.value].totalTests + total;
+  const tr = t[langSelect.value];
+  document.getElementById("totalTests").textContent = tr.totalModels + smalls.length + " • " + tr.totalTests + total;
 }
 
 function getSelectedModels(){
@@ -408,7 +411,7 @@ function getSelectedModels(){
 // { [device]: { canvas:{min,max,avg,median}, ..., count } }
 function loadAllStats(){
   if(!statsPromise){
-    statsPromise=rpc("get_device_stats").then(rows=>{
+    statsPromise=rpc("get_device_stats",{p_mode:MODE}).then(rows=>{
       const stats={};
       rows.forEach(r=>{
         const s=stats[r.device_name]||(stats[r.device_name]={count:0});
