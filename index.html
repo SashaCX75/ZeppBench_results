@@ -5,8 +5,8 @@
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>Device Test Statistics</title>
   <link rel="icon" href="images/favicon.ico" type="image/x-icon">
-  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.5.1"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.2.0"></script>
   <style>
     :root { --accent:#07c; }
 
@@ -130,7 +130,7 @@
     <div class="top-actions">
       <span class="theme-toggle" id="themeToggle" title="Toggle theme">🌙</span>
       <label for="lang" title="Language">
-		  <img id="langIcon" class="lang-flag" src="images/flags/en.svg" alt="en" width="24" height="16" />
+		  <img id="langIcon" class="lang-flag" src="images/flags/en.png" alt="en" width="24" height="16" />
       </label>
       <select id="lang">
         <option value="en">English</option>
@@ -265,7 +265,7 @@ function applyLang(){
 	}
 
   // обновляем надписи в списке моделей
-  document.querySelectorAll("#modelContainer small").forEach(el => {
+  document.querySelectorAll("#modelsContainer small").forEach(el => {
     const count = el.dataset.count;
     el.textContent = `(${t[langSelect.value].testCount}: ${count})`;
   });
@@ -379,8 +379,11 @@ async function loadModels(){
     modelContainer.appendChild(lbl);
   });
 
+  // сохранённый выбор читаем заново: при смене сортировки он уже обновлён в savePrefs
+  const savedModels=JSON.parse(localStorage.getItem("models") || "[]");
   const boxes=modelContainer.querySelectorAll("input[type=checkbox]");
-  if(boxes.length){
+  boxes.forEach(b=>{if(savedModels.includes(b.value)) b.checked=true;});
+  if(boxes.length && !modelContainer.querySelector("input:checked")){
     boxes[0].checked=true;
     boxes.forEach(b=>{if(b.value==="Balance 2") b.checked=true;});
   }
@@ -564,7 +567,7 @@ async function refreshChart(){
 // ===== EVENTS =====
 sortGroup.addEventListener("change",()=>{loadModels(); savePrefs();});
 metricGroup.addEventListener("change",()=>{refreshChart(); savePrefs();});
-modelContainer.addEventListener("change",()=>{refreshChart();});
+modelContainer.addEventListener("change",()=>{refreshChart(); savePrefs();});
 langSelect.addEventListener("change",()=>{applyLang(); savePrefs(); refreshChart();});
 
 // ===== INIT =====
