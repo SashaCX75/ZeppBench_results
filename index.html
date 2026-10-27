@@ -152,7 +152,7 @@
 
   <!-- Models -->
   <section class="card">
-    <h3 id="modelsHeading">Select models</h3>
+    <h3><span id="modelsHeading">Select models</span> <span id="modelsCount"></span></h3>
     <div class="models-list" id="modelsContainer"></div>
 	<div id="totalTests" class="muted" style="margin-top:8px; font-size:14px;">
 	  Total tests: 0
@@ -221,21 +221,21 @@ const labelTranslations={
 const t={
   en:{
     title:"Device testing statistics in the ZeppBench app", subtitle:"Live aggregated metrics from Supabase",
-    sortHeading:"Model sorting", totalTests: "Total tests: ", totalModels: "Models: ", recentTests: "Last 7 days: ", sortName:"By name", sortDesc:"By test count (↓)", sortAsc:"By test count (↑)",
+    sortHeading:"Model sorting", totalTests: "Total tests: ", recentTests: "Last 7 days: ", sortName:"By name", sortDesc:"By test count (↓)", sortAsc:"By test count (↑)",
     modelsHeading:"Select models", testCount: "number of tests",
     metricHeading:"Select which values to compare", metricMin:"Minimum values", metricAvg:"Average values", metricMax:"Maximum values",
     chartHeading:"Comparison results", chartContainer:"Loading...", noData:"No data", selectModels:"Select at least 2 models"
   },
   ru:{
     title:"Статистика тестирования устройств в приложении ZeppBench", subtitle:"Агрегированные показатели в реальном времени из Supabase",
-    sortHeading:"Сортировка моделей", totalTests: "Общее число тестов: ", totalModels: "Число моделей: ", recentTests: "За 7 дней: ", sortName:"По имени", sortDesc:"По числу тестов (↓)", sortAsc:"По числу тестов (↑)",
+    sortHeading:"Сортировка моделей", totalTests: "Общее число тестов: ", recentTests: "За 7 дней: ", sortName:"По имени", sortDesc:"По числу тестов (↓)", sortAsc:"По числу тестов (↑)",
     modelsHeading:"Выберите модели", testCount: "число тестов",
     metricHeading:"Выберите какие значения сравнивать", metricMin:"Минимальные значения", metricAvg:"Средние значения", metricMax:"Максимальные значения",
     chartHeading:"Результаты сравнения", chartContainer:"Загрузка...", noData:"Нет данных", selectModels:"Выберите хотя бы 2 модели"
   },
   uk:{
     title:"Статистика тестування пристроїв у додатку ZeppBench", subtitle:"Агреговані показники в режимі реального часу з Supabase",
-    sortHeading:"Сортування моделей", totalTests: "Загальна кількість тестів: ", totalModels: "Кількість моделей: ", recentTests: "За 7 днів: ", sortName:"За назвою", sortDesc:"За кількістю тестів (↓)", sortAsc:"За кількістю тестів (↑)",
+    sortHeading:"Сортування моделей", totalTests: "Загальна кількість тестів: ", recentTests: "За 7 днів: ", sortName:"За назвою", sortDesc:"За кількістю тестів (↓)", sortAsc:"За кількістю тестів (↑)",
     modelsHeading:"Оберіть моделі", testCount: "кількість тестів",
     metricHeading:"Виберіть які значення порівнювати", metricMin:"Мінімальні значення", metricAvg:"Середні значення", metricMax:"Максимальні значення",
     chartHeading:"Результати порівняння", chartContainer:"Завантаження...", noData:"Немає даних", selectModels:"Виберіть хоча б 2 моделі"
@@ -402,7 +402,8 @@ function updateTotalTests() {
     total += parseInt(small.dataset.count) || 0;
   });
   const tr = t[langSelect.value];
-  let text = tr.totalModels + smalls.length + " • " + tr.totalTests + total;
+  document.getElementById("modelsCount").textContent = smalls.length ? `(${smalls.length})` : "";
+  let text = tr.totalTests + total;
   if (recentRuns !== null) text += " • " + tr.recentTests + recentRuns;
   document.getElementById("totalTests").textContent = text;
 }
